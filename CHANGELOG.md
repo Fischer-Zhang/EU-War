@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2 — 教學劇本、線上試玩與 CI
+
+- **教學劇本**:新增 `00_tutorial` 基礎教練場——小地圖、少量弱敵,分步引導選取、移動、地形、遠程、白刃、騎兵衝鋒與整隊/構工/嚴陣。
+- **資料驅動教學提示**:劇本可帶 `tutorial` 提示陣列,戰鬥中於畫面下方以面板逐則呈現(下一步/略過),不影響一般戰役。演武場移至 `06_sandbox`,教學排於列表首位。
+- **線上試玩**:Godot Web(HTML5)匯出 + GitHub Pages 自動部署;以 coi-serviceworker 解決 SharedArrayBuffer 的跨源隔離需求。
+- **CI**:GitHub Actions 於 push/PR 執行快速資料驗證與無頭 GDScript 測試;UI 冒煙測試改載入教學劇本以涵蓋提示面板路徑。
+- **專案**:加入 MIT `LICENSE` 與 README CI 徽章、線上試玩連結。
+
 ## v0.1 — 首個可玩垂直切片
 
 初版:14–18 世紀歐洲戰爭的戰術六角格戰棋基礎,架構參考 WorldWarII。

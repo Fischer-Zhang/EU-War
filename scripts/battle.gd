@@ -20,7 +20,7 @@ const TurnManager := preload("res://scripts/turn/turn_manager.gd")
 const VictoryChecker := preload("res://scripts/scenario/victory_checker.gd")
 const AIController := preload("res://scripts/turn/ai_controller.gd")
 
-const DEFAULT_SCENARIO := "00_sandbox"
+const DEFAULT_SCENARIO := "00_tutorial"
 
 @onready var hex_map: HexMap = $HexMap
 @onready var camera = $Camera
@@ -54,6 +54,14 @@ var move_targets: Dictionary = {}   # coord -> cost
 var attack_targets: Array = []      # Units attackable from current position
 var _cycle_index: int = 0
 
+# Tutorial: an optional ordered list of tips (scenario["tutorial"]) shown one at
+# a time in a bottom-centered panel built at runtime. Absent on normal battles.
+var _tips: Array = []
+var _tip_index: int = 0
+var _hint_panel: Panel = null
+var _hint_label: RichTextLabel = null
+var _hint_next_button: Button = null
+
 func _ready() -> void:
 	var sid := GameState.current_scenario_id
 	if sid == "":
@@ -69,6 +77,7 @@ func _ready() -> void:
 	# Center the camera on the map.
 	if camera and camera.has_method("fit_world_rect"):
 		camera.fit_world_rect(hex_map.get_map_rect(), Rect2(), 1.0)
+	_setup_tutorial()
 	turn_manager.emit_initial()
 
 func _setup_scenario() -> void:
@@ -601,10 +610,90 @@ func _show_turn_banner(text: String) -> void:
 	tween.tween_interval(0.9)
 	tween.tween_property(turn_banner, "modulate:a", 0.0, 0.6)
 
+# ------------------------------------------------------------------ tutorial
+
+func _setup_tutorial() -> void:
+	var tips: Array = scenario.get("tutorial", [])
+	if tips.is_empty():
+		return
+	_tips = tips
+	_tip_index = 0
+
+	var ui := $UI
+	_hint_panel = Panel.new()
+	_hint_panel.name = "TutorialHint"
+	_hint_panel.anchor_left = 0.5
+	_hint_panel.anchor_right = 0.5
+	_hint_panel.anchor_top = 1.0
+	_hint_panel.anchor_bottom = 1.0
+	_hint_panel.offset_left = -380
+	_hint_panel.offset_right = 380
+	_hint_panel.offset_top = -168
+	_hint_panel.offset_bottom = -24
+	ui.add_child(_hint_panel)
+
+	var margin := MarginContainer.new()
+	margin.anchor_right = 1.0
+	margin.anchor_bottom = 1.0
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 16)
+	_hint_panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	_hint_label = RichTextLabel.new()
+	_hint_label.bbcode_enabled = true
+	_hint_label.fit_content = true
+	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_hint_label.add_theme_font_size_override("normal_font_size", 16)
+	vbox.add_child(_hint_label)
+
+	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_END
+	buttons.add_theme_constant_override("separation", 10)
+	vbox.add_child(buttons)
+
+	var skip_button := Button.new()
+	skip_button.text = "略過教學"
+	skip_button.pressed.connect(_close_tutorial)
+	buttons.add_child(skip_button)
+
+	_hint_next_button = Button.new()
+	_hint_next_button.pressed.connect(_advance_tip)
+	buttons.add_child(_hint_next_button)
+
+	_show_tip()
+
+func _show_tip() -> void:
+	if _hint_label == null:
+		return
+	var total := _tips.size()
+	_hint_label.text = "[color=#8fb7e0]教學 %d/%d[/color]\n\n%s" % [
+		_tip_index + 1, total, String(_tips[_tip_index])]
+	_hint_next_button.text = "開始 ✓" if _tip_index >= total - 1 else "下一步 ▶"
+
+func _advance_tip() -> void:
+	if _tip_index >= _tips.size() - 1:
+		_close_tutorial()
+		return
+	_tip_index += 1
+	_show_tip()
+
+func _close_tutorial() -> void:
+	if _hint_panel != null and is_instance_valid(_hint_panel):
+		_hint_panel.queue_free()
+	_hint_panel = null
+	_hint_label = null
+	_hint_next_button = null
+
 func _end_battle(w: String) -> void:
 	battle_over = true
 	winner = w
 	_deselect()
+	_close_tutorial()
 	var player_won := w == player_faction
 	result_label.text = "勝利!" if player_won else "戰敗"
 	result_label.modulate = Color(0.4, 0.9, 0.4) if player_won else Color(0.9, 0.4, 0.4)

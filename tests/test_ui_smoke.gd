@@ -20,7 +20,7 @@ func _run() -> void:
 		printerr("FAIL: GameState autoload missing")
 		quit(1)
 		return
-	gs.current_scenario_id = "00_sandbox"
+	gs.current_scenario_id = "00_tutorial"
 	for path in SCENES:
 		var ps = load(path)
 		if ps == null:
