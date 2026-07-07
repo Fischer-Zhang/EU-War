@@ -1,0 +1,11 @@
+# Godot editor/import cache — rebuilt per machine
+.godot/
+# Generated builds
+exports/
+dist/
+build/
+bin/
+# OS cruft
+.DS_Store
+__pycache__/
+*.pyc

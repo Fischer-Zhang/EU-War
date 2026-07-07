@@ -1,0 +1,618 @@
+extends Node2D
+
+# Battle scene orchestration: loads a scenario, drives the turn cycle, handles
+# player input (select / move / attack / entrench / brace / rally) and runs the
+# AI turn. Combat is resolved deterministically through CombatResolver; morale,
+# suppression, veteran XP, fog of war, zone of control and braced reaction fire
+# all layer on top of the shared rules.
+
+const HexCoord := preload("res://scripts/grid/hex_coord.gd")
+const HexMap := preload("res://scripts/grid/hex_map.gd")
+const Unit := preload("res://scripts/units/unit.gd")
+const UnitFactory := preload("res://scripts/units/unit_factory.gd")
+const Pathfinding := preload("res://scripts/grid/pathfinding.gd")
+const Visibility := preload("res://scripts/grid/visibility.gd")
+const CombatRules := preload("res://scripts/combat/combat_rules.gd")
+const CombatResolver := preload("res://scripts/combat/combat_resolver.gd")
+const CombatEffects := preload("res://scripts/combat/combat_effects.gd")
+const CombatModifiers := preload("res://scripts/combat/combat_modifiers.gd")
+const TurnManager := preload("res://scripts/turn/turn_manager.gd")
+const VictoryChecker := preload("res://scripts/scenario/victory_checker.gd")
+const AIController := preload("res://scripts/turn/ai_controller.gd")
+
+const DEFAULT_SCENARIO := "00_sandbox"
+
+@onready var hex_map: HexMap = $HexMap
+@onready var camera = $Camera
+@onready var info_label: Label = $UI/InfoLabel
+@onready var status_label: Label = $UI/StatusLabel
+@onready var turn_banner: Label = $UI/TurnBanner
+@onready var unit_name_label: Label = $UI/ActionDock/InfoPanel/VBox/UnitName
+@onready var faction_label: Label = $UI/ActionDock/InfoPanel/VBox/FactionLabel
+@onready var stats_label: RichTextLabel = $UI/ActionDock/InfoPanel/VBox/StatsLabel
+@onready var terrain_label: RichTextLabel = $UI/ActionDock/InfoPanel/VBox/TerrainLabel
+@onready var entrench_button: Button = $UI/ActionDock/EntrenchButton
+@onready var brace_button: Button = $UI/ActionDock/BraceButton
+@onready var rally_button: Button = $UI/ActionDock/RallyButton
+@onready var end_turn_button: Button = $UI/ActionDock/EndTurnButton
+@onready var result_panel: Panel = $UI/ResultPanel
+@onready var result_label: Label = $UI/ResultPanel/ResultLabel
+@onready var result_summary: RichTextLabel = $UI/ResultPanel/ResultSummary
+@onready var menu_button: Button = $UI/ResultPanel/MenuButton
+
+var scenario: Dictionary = {}
+var factions: Dictionary = {}
+var units: Array = []
+var turn_manager: TurnManager
+var player_faction: String = ""
+var winner: String = ""
+var battle_over: bool = false
+
+# Player interaction state
+var selected_unit: Unit = null
+var move_targets: Dictionary = {}   # coord -> cost
+var attack_targets: Array = []      # Units attackable from current position
+var _cycle_index: int = 0
+
+func _ready() -> void:
+	var sid := GameState.current_scenario_id
+	if sid == "":
+		sid = DEFAULT_SCENARIO
+	scenario = DataLoader.get_scenario(sid)
+	if scenario.is_empty():
+		scenario = DataLoader.get_scenario(DEFAULT_SCENARIO)
+	_setup_scenario()
+	_connect_ui()
+	turn_manager = TurnManager.new()
+	turn_manager.configure(factions)
+	turn_manager.turn_started.connect(_on_turn_started)
+	# Center the camera on the map.
+	if camera and camera.has_method("fit_world_rect"):
+		camera.fit_world_rect(hex_map.get_map_rect(), Rect2(), 1.0)
+	turn_manager.emit_initial()
+
+func _setup_scenario() -> void:
+	hex_map.load_from_scenario(scenario)
+	var built := UnitFactory.build(scenario, hex_map)
+	factions = built["factions"]
+	units = built["units"]
+	for u in units:
+		hex_map.register_unit(u)
+		u.ranked_up.connect(func(_r): _flash_status("%s 晉升!" % u.display_name))
+	# Player faction = first faction whose controller is "player".
+	for fid in factions.keys():
+		if String(factions[fid].get("controller", "")) == "player":
+			player_faction = fid
+			break
+	if player_faction == "":
+		player_faction = factions.keys()[0]
+	# Objective marker from a capture victory condition.
+	var vic: Dictionary = scenario.get("victory", {}).get(player_faction, {})
+	if String(vic.get("type", "")) == "capture":
+		hex_map.set_objective_coords([VictoryChecker.coord_from_array(vic.get("target", [0, 0]))])
+	_refresh_visibility()
+
+func _connect_ui() -> void:
+	hex_map.hex_clicked.connect(_on_hex_clicked)
+	hex_map.hex_hovered.connect(_on_hex_hovered)
+	end_turn_button.pressed.connect(_on_end_turn_pressed)
+	entrench_button.pressed.connect(_on_entrench_pressed)
+	brace_button.pressed.connect(_on_brace_pressed)
+	rally_button.pressed.connect(_on_rally_pressed)
+	menu_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/scenario_select.tscn"))
+	result_panel.visible = false
+	_update_action_buttons()
+
+# ------------------------------------------------------------------ turn flow
+
+func _on_turn_started(faction_id: String, turn_number: int) -> void:
+	if battle_over:
+		return
+	_deselect()
+	for u in units:
+		if u.faction_id == faction_id and u.is_alive():
+			u.reset_for_new_turn()
+			_recover_morale(u)
+	_refresh_visibility()
+	_update_info_label(faction_id, turn_number)
+	_show_turn_banner("%s 的回合 · 第 %d 回合" % [_faction_name(faction_id), turn_number])
+	if _is_ai(faction_id):
+		_set_player_controls(false)
+		await _auto_withdraw_routed(faction_id)
+		await _run_ai_turn(faction_id)
+		if not battle_over:
+			_advance_turn()
+	else:
+		_set_player_controls(true)
+		_flash_status("你的回合:選取部隊行動。")
+
+func _advance_turn() -> void:
+	if battle_over:
+		return
+	var w := VictoryChecker.evaluate(scenario, factions, units, turn_manager.turn_number)
+	if w != "":
+		_end_battle(w)
+		return
+	turn_manager.end_turn()
+
+func _on_end_turn_pressed() -> void:
+	if battle_over or _is_ai(turn_manager.current_faction()):
+		return
+	_advance_turn()
+
+# ------------------------------------------------------------------ AI turn
+
+func _run_ai_turn(faction_id: String) -> void:
+	var ai := AIController.new(GameState.difficulty)
+	var ai_units := _living_units_of(faction_id)
+	ai_units.sort_custom(func(a, b): return a.coord.y * 10000 + a.coord.x < b.coord.y * 10000 + b.coord.x)
+	for u in ai_units:
+		if battle_over:
+			return
+		if not u.is_alive() or u.is_done_for_turn() or u.routed:
+			continue
+		var order = ai.plan_unit(u, _living_units(), hex_map, factions)
+		if order == null:
+			continue
+		if order.path.size() >= 2:
+			hex_map.move_unit_along_path(u, order.path)
+			await get_tree().create_timer(0.18).timeout
+			await _resolve_brace_reactions(u)
+			if not u.is_alive():
+				continue
+		_refresh_visibility()
+		if order.action == "attack" and order.target != null and order.target.is_alive():
+			var atk_def := DataLoader.get_unit_def(u.type_id)
+			if CombatRules.can_attack_target(u, order.target, atk_def, hex_map, _visible_for(faction_id)):
+				await _perform_attack(u, order.target)
+			else:
+				u.has_attacked = true
+		elif order.action == "entrench":
+			u.entrench()
+		else:
+			u.has_attacked = true
+		await get_tree().create_timer(0.14).timeout
+	_refresh_visibility()
+
+func _auto_withdraw_routed(faction_id: String) -> void:
+	for u in _living_units_of(faction_id):
+		if not u.routed:
+			continue
+		var occ := _occupancy()
+		var away := _step_away_from_enemies(u)
+		if away != u.coord and not occ.has(away) and not hex_map.terrain_impassable(hex_map.terrain_at(away)):
+			hex_map.move_unit_along_path(u, [u.coord, away])
+			await get_tree().create_timer(0.1).timeout
+		u.has_attacked = true
+
+func _step_away_from_enemies(u: Unit) -> Vector2i:
+	var best := u.coord
+	var best_dist := _nearest_enemy_dist(u.coord, u.faction_id)
+	for n in HexCoord.neighbors(u.coord):
+		if hex_map.terrain_at(n) == "" or hex_map.terrain_impassable(hex_map.terrain_at(n)):
+			continue
+		var d := _nearest_enemy_dist(n, u.faction_id)
+		if d > best_dist:
+			best_dist = d
+			best = n
+	return best
+
+# ------------------------------------------------------------------ combat
+
+func _perform_attack(attacker: Unit, target: Unit) -> void:
+	var atk_def := DataLoader.get_unit_def(attacker.type_id)
+	var def_def := DataLoader.get_unit_def(target.type_id)
+	var atk_mods := CombatModifiers.for_unit(attacker, DataLoader.get_general_def(attacker.general_id))
+	var def_mods := CombatModifiers.for_unit(target, DataLoader.get_general_def(target.general_id))
+	var atk_terrain := _terrain_def(attacker.coord)
+	var def_terrain := _terrain_def(target.coord)
+	var dist := HexCoord.distance(attacker.coord, target.coord)
+	var result := CombatResolver.resolve(
+		atk_def, def_def, attacker.hp, target.hp, atk_terrain, def_terrain,
+		dist, target.dig_in_level, atk_mods, def_mods, false)
+
+	attacker.play_attack_animation(target.position)
+	attacker.has_moved = true
+	attacker.has_attacked = true
+	attacker.on_overwatch = false
+
+	_apply_hit(attacker, target, result, false)
+
+	# Mortar / bombard splash to hexes around the primary target.
+	if int(atk_def.get("splash_radius", 0)) > 0:
+		_apply_splash(attacker, target, atk_def, atk_mods, atk_terrain, dist)
+
+	# Counter-attack on a surviving defender.
+	if not result.defender_dies and result.counter_damage > 0 and attacker.is_alive():
+		target.play_attack_animation(attacker.position)
+		attacker.take_damage(result.counter_damage)
+		if not attacker.is_alive():
+			_kill_unit(attacker)
+			target.gain_xp(2)
+	if attacker.is_alive():
+		attacker.gain_xp(2 if result.defender_dies else 1)
+
+	_refresh_visibility()
+	_update_selected_panel()
+	await get_tree().create_timer(0.12).timeout
+	var w := VictoryChecker.evaluate(scenario, factions, units, turn_manager.turn_number)
+	if w != "":
+		_end_battle(w)
+
+func _apply_hit(attacker: Unit, target: Unit, result, is_reaction: bool) -> void:
+	target.take_damage(result.damage_to_defender)
+	if result.defender_dig_in_loss > 0:
+		target.reduce_dig_in(result.defender_dig_in_loss)
+	if result.defender_dies:
+		var dead := target
+		_kill_unit(dead)
+		return
+	# Suppression + morale pressure on a survivor.
+	if result.suppression_to_defender > 0:
+		target.add_suppression(result.suppression_to_defender)
+	var pressure: int = result.suppression_to_defender
+	if pressure > 0:
+		var adj := _adjacent_enemy_count(target)
+		var pinned := CombatEffects.is_pinned(target.suppression)
+		target.morale = CombatEffects.morale_after_hit(target.morale, pressure, adj, pinned)
+		if CombatEffects.is_routed_morale(target.morale):
+			target.routed = true
+			target.on_overwatch = false
+			_flash_status("%s 潰散!" % target.display_name)
+	if not is_reaction:
+		target.gain_xp(1)
+	target.queue_redraw()
+
+func _apply_splash(attacker: Unit, center: Unit, atk_def: Dictionary, atk_mods: Dictionary,
+		atk_terrain: Dictionary, _dist: int) -> void:
+	var pct := int(atk_def.get("splash_damage_pct", CombatEffects.SPLASH_DAMAGE_PCT))
+	var radius := int(atk_def.get("splash_radius", 1))
+	var center_coord := center.coord
+	for u in _living_units():
+		if u.faction_id == attacker.faction_id or u == center:
+			continue
+		if HexCoord.distance(center_coord, u.coord) > radius:
+			continue
+		var def_def := DataLoader.get_unit_def(u.type_id)
+		var def_mods := CombatModifiers.for_unit(u, DataLoader.get_general_def(u.general_id))
+		var full := CombatResolver.resolve(atk_def, def_def, attacker.hp, u.hp, atk_terrain,
+			_terrain_def(u.coord), radius + 1, u.dig_in_level, atk_mods, def_mods, true)
+		var dmg := CombatEffects.splash_damage(full.damage_to_defender, pct)
+		u.take_damage(dmg)
+		if not u.is_alive():
+			_kill_unit(u)
+		else:
+			u.add_suppression(1)
+
+func _resolve_brace_reactions(mover: Unit) -> void:
+	# Any enemy braced unit that can now strike the mover fires reaction fire once.
+	for u in _living_units():
+		if u.faction_id == mover.faction_id or not u.on_overwatch or u.routed:
+			continue
+		if not mover.is_alive():
+			return
+		var atk_def := DataLoader.get_unit_def(u.type_id)
+		if not CombatRules.can_attack_target(u, mover, atk_def, hex_map, _visible_for(u.faction_id)):
+			continue
+		var def_def := DataLoader.get_unit_def(mover.type_id)
+		var atk_mods := CombatModifiers.for_unit(u, DataLoader.get_general_def(u.general_id))
+		var def_mods := CombatModifiers.for_unit(mover, DataLoader.get_general_def(mover.general_id))
+		var dist := HexCoord.distance(u.coord, mover.coord)
+		var full := CombatResolver.resolve(atk_def, def_def, u.hp, mover.hp, _terrain_def(u.coord),
+			_terrain_def(mover.coord), dist, mover.dig_in_level, atk_mods, def_mods, true)
+		var react := CombatResolver.Result.new()
+		react.damage_to_defender = CombatEffects.brace_damage(full.damage_to_defender, atk_def)
+		react.defender_dies = (mover.hp - react.damage_to_defender) <= 0
+		react.suppression_to_defender = CombatEffects.suppression_for_attack(atk_def, react.damage_to_defender, react.defender_dies)
+		u.on_overwatch = false
+		u.play_attack_animation(mover.position)
+		_flash_status("%s 對 %s 進行預備射擊!" % [u.display_name, mover.display_name])
+		_apply_hit(u, mover, react, true)
+		u.gain_xp(1)
+		await get_tree().create_timer(0.12).timeout
+
+func _kill_unit(u: Unit) -> void:
+	hex_map.place_wreckage(u.coord, u.faction_color)
+	hex_map.unregister_unit(u)
+	units.erase(u)
+	if selected_unit == u:
+		_deselect()
+	u.play_death_animation()
+
+# ------------------------------------------------------------------ input
+
+func _on_hex_clicked(coord: Vector2i, _terrain_id: String) -> void:
+	if battle_over or _is_ai(turn_manager.current_faction()):
+		return
+	var clicked := hex_map.unit_at(coord)
+	# Attack: clicked an enemy that's a current target.
+	if selected_unit != null and clicked != null and clicked in attack_targets:
+		await _perform_attack(selected_unit, clicked)
+		_deselect()
+		return
+	# Select own ready unit.
+	if clicked != null and clicked.faction_id == player_faction:
+		if clicked.routed:
+			_flash_status("%s 已潰散,無法指揮。" % clicked.display_name)
+			return
+		_select(clicked)
+		return
+	# Move selected unit into a reachable hex.
+	if selected_unit != null and not selected_unit.has_moved and move_targets.has(coord):
+		_move_selected(coord)
+		return
+	_deselect()
+
+func _select(u: Unit) -> void:
+	if selected_unit != null:
+		selected_unit.set_selected(false)
+	selected_unit = u
+	u.set_selected(true)
+	_recompute_targets()
+	_update_selected_panel()
+	_update_action_buttons()
+
+func _deselect() -> void:
+	if selected_unit != null:
+		selected_unit.set_selected(false)
+	selected_unit = null
+	move_targets = {}
+	attack_targets = []
+	hex_map.clear_movement_range()
+	_update_selected_panel()
+	_update_action_buttons()
+
+func _recompute_targets() -> void:
+	move_targets = {}
+	attack_targets = []
+	hex_map.clear_movement_range()
+	if selected_unit == null:
+		return
+	var unit_def := DataLoader.get_unit_def(selected_unit.type_id)
+	var general_def := DataLoader.get_general_def(selected_unit.general_id)
+	if not selected_unit.has_moved:
+		var mp := selected_unit.effective_move(unit_def, general_def)
+		move_targets = Pathfinding.movement_range(
+			selected_unit.coord, mp, hex_map, _occupancy(), player_faction, selected_unit.type_id)
+	if not selected_unit.is_done_for_turn():
+		attack_targets = CombatRules.targets_for_attacker(
+			selected_unit, unit_def, _living_units(), hex_map, _visible_for(player_faction))
+	# Paint overlays: movement first, then attack targets on top.
+	var move_coords: Array = move_targets.keys()
+	hex_map.show_movement_range(move_coords)
+	var atk_coords: Array = []
+	for t in attack_targets:
+		atk_coords.append(t.coord)
+	if not atk_coords.is_empty():
+		hex_map._paint_overlay_on_layer(hex_map.range_overlays, atk_coords, hex_map.ATTACK_OVERLAY_COLOR, 0.85)
+
+func _move_selected(coord: Vector2i) -> void:
+	var path := Pathfinding.reconstruct_path(
+		selected_unit.coord, coord, move_targets, hex_map, _occupancy(), player_faction, selected_unit.type_id)
+	if path.size() < 2:
+		return
+	var mover := selected_unit
+	hex_map.move_unit_along_path(mover, path)
+	await get_tree().create_timer(0.18).timeout
+	await _resolve_brace_reactions(mover)
+	_refresh_visibility()
+	if mover.is_alive() and selected_unit == mover:
+		_recompute_targets()
+		_update_selected_panel()
+		_update_action_buttons()
+	else:
+		_deselect()
+
+func _on_entrench_pressed() -> void:
+	if selected_unit == null or selected_unit.is_done_for_turn():
+		return
+	selected_unit.entrench()
+	_flash_status("%s 構築工事。" % selected_unit.display_name)
+	_deselect()
+
+func _on_brace_pressed() -> void:
+	if selected_unit == null or selected_unit.is_done_for_turn():
+		return
+	selected_unit.on_overwatch = true
+	selected_unit.has_moved = true
+	selected_unit.has_attacked = true
+	_flash_status("%s 進入嚴陣以待。" % selected_unit.display_name)
+	_deselect()
+
+func _on_rally_pressed() -> void:
+	if selected_unit == null or selected_unit.is_done_for_turn():
+		return
+	if selected_unit.suppression == 0 and not selected_unit.routed:
+		return
+	var recovered := selected_unit.rally(_terrain_def(selected_unit.coord))
+	_flash_status("%s 整隊 (壓制 -%d)。" % [selected_unit.display_name, recovered])
+	_deselect()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if battle_over or _is_ai(turn_manager.current_faction()):
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_TAB:
+				_cycle_units()
+				get_viewport().set_input_as_handled()
+			KEY_O:
+				_on_brace_pressed()
+			KEY_R:
+				_on_rally_pressed()
+			KEY_E:
+				_on_entrench_pressed()
+			KEY_SPACE:
+				_on_end_turn_pressed()
+
+func _cycle_units() -> void:
+	var ready_units: Array = []
+	for u in _living_units_of(player_faction):
+		if not u.is_done_for_turn() and not u.routed:
+			ready_units.append(u)
+	if ready_units.is_empty():
+		return
+	ready_units.sort_custom(func(a, b): return a.coord.y * 10000 + a.coord.x < b.coord.y * 10000 + b.coord.x)
+	_cycle_index = _cycle_index % ready_units.size()
+	var u: Unit = ready_units[_cycle_index]
+	_cycle_index += 1
+	_select(u)
+	if camera and camera.has_method("focus_on"):
+		camera.focus_on(u.position)
+
+# ------------------------------------------------------------------ helpers
+
+func _refresh_visibility() -> void:
+	var vis := _visible_for(player_faction)
+	hex_map.apply_visibility(vis, player_faction)
+
+func _visible_for(faction_id: String) -> Dictionary:
+	return Visibility.compute_visible_hexes(_living_units(), faction_id, hex_map, DataLoader.units)
+
+func _recover_morale(u: Unit) -> void:
+	if _adjacent_enemy_count(u) == 0 and u.morale < u.morale_max:
+		u.morale = CombatEffects.morale_after_recovery(u.morale, u.morale_max)
+		if u.routed and u.morale >= CombatEffects.reform_threshold(u.morale_max):
+			u.routed = false
+		u.queue_redraw()
+
+func _adjacent_enemy_count(u: Unit) -> int:
+	var n := 0
+	for nb in HexCoord.neighbors(u.coord):
+		var other := hex_map.unit_at(nb)
+		if other != null and other.is_alive() and other.faction_id != u.faction_id:
+			n += 1
+	return n
+
+func _nearest_enemy_dist(from: Vector2i, faction: String) -> int:
+	var best := 9999
+	for u in _living_units():
+		if u.faction_id == faction:
+			continue
+		best = min(best, HexCoord.distance(from, u.coord))
+	return best
+
+func _living_units() -> Array:
+	var out: Array = []
+	for u in units:
+		if u.is_alive():
+			out.append(u)
+	return out
+
+func _living_units_of(faction_id: String) -> Array:
+	var out: Array = []
+	for u in units:
+		if u.is_alive() and u.faction_id == faction_id:
+			out.append(u)
+	return out
+
+func _occupancy() -> Dictionary:
+	var occ := {}
+	for u in _living_units():
+		occ[u.coord] = u
+	return occ
+
+func _terrain_def(coord: Vector2i) -> Dictionary:
+	var tid := hex_map.terrain_at(coord)
+	if tid == "":
+		return {}
+	return DataLoader.get_terrain_def(tid)
+
+func _is_ai(faction_id: String) -> bool:
+	return String(factions.get(faction_id, {}).get("controller", "ai")) != "player"
+
+func _faction_name(faction_id: String) -> String:
+	return String(factions.get(faction_id, {}).get("name", faction_id))
+
+func _coord_key(c: Vector2i) -> int:
+	return c.y * 10000 + c.x
+
+# ------------------------------------------------------------------ UI
+
+func _set_player_controls(on: bool) -> void:
+	end_turn_button.disabled = not on
+	_update_action_buttons()
+
+func _update_action_buttons() -> void:
+	var active := selected_unit != null and not _is_ai(turn_manager.current_faction()) and not battle_over
+	var can_act := active and not selected_unit.is_done_for_turn()
+	entrench_button.visible = can_act
+	brace_button.visible = can_act
+	rally_button.visible = active and (selected_unit.suppression > 0 or selected_unit.routed)
+
+func _update_info_label(faction_id: String, turn_number: int) -> void:
+	info_label.text = "第 %d 回合 — %s%s" % [
+		turn_number, _faction_name(faction_id),
+		"(AI)" if _is_ai(faction_id) else "(你)"]
+
+func _update_selected_panel() -> void:
+	if selected_unit == null or not is_instance_valid(selected_unit):
+		unit_name_label.text = "(未選取)"
+		faction_label.text = ""
+		stats_label.text = "點擊己方部隊以查看數據。"
+		terrain_label.text = ""
+		return
+	var u := selected_unit
+	var d := DataLoader.get_unit_def(u.type_id)
+	var mods := CombatModifiers.for_unit(u, DataLoader.get_general_def(u.general_id))
+	unit_name_label.text = u.display_name
+	var gtext := ""
+	if u.general_id != "":
+		gtext = " · 指揮:%s" % String(DataLoader.get_general_def(u.general_id).get("name_zh", ""))
+	faction_label.text = "%s%s" % [_faction_name(u.faction_id), gtext]
+	var atk := int(d.get("attack", 0)) + int(mods.get("attack", 0))
+	var df := int(d.get("defense", 0)) + int(mods.get("defense", 0))
+	var vs := int(d.get("vs_armor", 0)) + int(mods.get("vs_armor", 0))
+	var lines := []
+	lines.append("HP [b]%d/%d[/b]   士氣 %d/%d" % [u.hp, u.max_hp, u.morale, u.morale_max])
+	lines.append("攻 [b]%d[/b]  防 [b]%d[/b]  射程 %d  移動 %d" % [atk, df, int(d.get("range", 1)), int(d.get("move", 0))])
+	lines.append("破甲 %d  裝甲 %d  視野 %d" % [vs, int(d.get("armor", 0)), int(d.get("vision", 3))])
+	var status := []
+	if u.rank > 0: status.append("老兵 L%d" % u.rank)
+	if u.dig_in_level > 0: status.append("工事 %d" % u.dig_in_level)
+	if u.suppression > 0: status.append("壓制 %d" % u.suppression)
+	if u.on_overwatch: status.append("嚴陣")
+	if u.routed: status.append("[color=#e05050]潰散[/color]")
+	if not status.is_empty():
+		lines.append(" · ".join(status))
+	stats_label.text = "\n".join(lines)
+	var tid := hex_map.terrain_at(u.coord)
+	var tdef := DataLoader.get_terrain_def(tid)
+	terrain_label.text = "地形:%s (防 %+d)" % [String(tdef.get("name_zh", tid)), int(tdef.get("defense", 0))]
+
+func _on_hex_hovered(coord: Vector2i, terrain_id: String) -> void:
+	if terrain_id == "":
+		return
+	var u := hex_map.unit_at(coord)
+	if u != null and u.visible:
+		status_label.text = "%s — HP %d/%d  %s" % [u.display_name, u.hp, u.max_hp, _faction_name(u.faction_id)]
+	else:
+		var tdef := DataLoader.get_terrain_def(terrain_id)
+		status_label.text = "%s (移動 %d, 防 %+d)" % [
+			String(tdef.get("name_zh", terrain_id)), int(tdef.get("move_cost", 1)), int(tdef.get("defense", 0))]
+
+func _flash_status(text: String) -> void:
+	status_label.text = text
+
+func _show_turn_banner(text: String) -> void:
+	turn_banner.text = text
+	turn_banner.modulate.a = 1.0
+	var tween := create_tween()
+	tween.tween_interval(0.9)
+	tween.tween_property(turn_banner, "modulate:a", 0.0, 0.6)
+
+func _end_battle(w: String) -> void:
+	battle_over = true
+	winner = w
+	_deselect()
+	var player_won := w == player_faction
+	result_label.text = "勝利!" if player_won else "戰敗"
+	result_label.modulate = Color(0.4, 0.9, 0.4) if player_won else Color(0.9, 0.4, 0.4)
+	var lines := []
+	lines.append("[b]%s[/b] 取得勝利。" % _faction_name(w))
+	lines.append("")
+	for fid in factions.keys():
+		lines.append("%s 存活部隊:%d" % [_faction_name(fid), _living_units_of(fid).size()])
+	result_summary.text = "\n".join(lines)
+	result_panel.visible = true
+	GameState.end_scenario(w, {"winner": w})
