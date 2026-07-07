@@ -187,6 +187,18 @@ func unregister_unit(unit: Unit) -> void:
 	if occupants.get(unit.coord) == unit:
 		occupants.erase(unit.coord)
 
+# Instantly relocate a unit to an empty hex (used by the deployment phase).
+# Does not touch has_moved/turn state or animate — a plain teleport.
+func relocate_unit(unit: Unit, dest: Vector2i) -> void:
+	if dest == unit.coord:
+		return
+	if occupants.get(unit.coord) == unit:
+		occupants.erase(unit.coord)
+	occupants[dest] = unit
+	unit.coord = dest
+	unit.position = HexCoord.to_pixel(dest, HEX_SIZE)
+	unit.queue_redraw()
+
 func move_unit_along_path(unit: Unit, path: Array) -> void:
 	if path.size() < 2:
 		return

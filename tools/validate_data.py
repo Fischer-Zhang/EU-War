@@ -92,6 +92,20 @@ def main():
                 errors.append(f"{sid}: duplicate coord {u.get('at')} ({u.get('name')} & {seen[key]})")
             seen[key] = u.get("name")
 
+        # Deployment zones (optional): faction must exist, rect in bounds.
+        for fid, cfg in s.get("deployment", {}).items():
+            if fid not in faction_ids:
+                errors.append(f"{sid}: deployment for unknown faction '{fid}'")
+            cols = cfg.get("cols", [0, 0])
+            rows = cfg.get("rows", [0, 0])
+            if not (len(cols) == 2 and len(rows) == 2):
+                errors.append(f"{sid}: deployment {fid} needs 'cols' and 'rows' pairs")
+                continue
+            if not (0 <= cols[0] <= cols[1] < (w or 0)):
+                errors.append(f"{sid}: deployment {fid} cols {cols} out of bounds")
+            if not (0 <= rows[0] <= rows[1] < (h or 0)):
+                errors.append(f"{sid}: deployment {fid} rows {rows} out of bounds")
+
         # Victory targets in bounds.
         for fid, cond in s.get("victory", {}).items():
             if cond.get("type") == "capture":

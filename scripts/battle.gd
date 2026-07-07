@@ -62,6 +62,13 @@ var _hint_panel: Panel = null
 var _hint_label: RichTextLabel = null
 var _hint_next_button: Button = null
 
+# Deployment: an optional pre-battle phase (scenario["deployment"][faction])
+# letting the player rearrange their units inside a zone before turn 1.
+var _deploy_mode: bool = false
+var _deploy_zone: Dictionary = {}   # axial coord -> true (valid placement hexes)
+var _deploy_pick: Unit = null       # unit currently picked up for placement
+var _deploy_bar: Panel = null
+
 func _ready() -> void:
 	var sid := GameState.current_scenario_id
 	if sid == "":
@@ -77,8 +84,11 @@ func _ready() -> void:
 	# Center the camera on the map.
 	if camera and camera.has_method("fit_world_rect"):
 		camera.fit_world_rect(hex_map.get_map_rect(), Rect2(), 1.0)
-	_setup_tutorial()
-	turn_manager.emit_initial()
+	if _has_deployment():
+		_enter_deploy_mode()
+	else:
+		_setup_tutorial()
+		turn_manager.emit_initial()
 
 func _setup_scenario() -> void:
 	hex_map.load_from_scenario(scenario)
@@ -331,6 +341,9 @@ func _kill_unit(u: Unit) -> void:
 # ------------------------------------------------------------------ input
 
 func _on_hex_clicked(coord: Vector2i, _terrain_id: String) -> void:
+	if _deploy_mode:
+		_on_deploy_clicked(coord)
+		return
 	if battle_over or _is_ai(turn_manager.current_faction()):
 		return
 	var clicked := hex_map.unit_at(coord)
@@ -445,7 +458,7 @@ func _on_rally_pressed() -> void:
 	_deselect()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if battle_over or _is_ai(turn_manager.current_faction()):
+	if battle_over or _deploy_mode or _is_ai(turn_manager.current_faction()):
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
@@ -726,6 +739,126 @@ func _close_tutorial() -> void:
 	_hint_panel = null
 	_hint_label = null
 	_hint_next_button = null
+
+# ------------------------------------------------------------------ deployment
+
+func _has_deployment() -> bool:
+	var dep: Dictionary = scenario.get("deployment", {})
+	return dep.has(player_faction)
+
+func _enter_deploy_mode() -> void:
+	_deploy_mode = true
+	_compute_deploy_zone()
+	_set_player_controls(false)
+	end_turn_button.visible = false
+	info_label.text = "部署階段 — %s" % _faction_name(player_faction)
+	_show_turn_banner("部署階段:排好你的陣型")
+	hex_map.show_movement_range(_deploy_zone.keys())
+	_build_deploy_bar()
+
+func _compute_deploy_zone() -> void:
+	_deploy_zone = {}
+	var cfg: Dictionary = scenario.get("deployment", {}).get(player_faction, {})
+	var cols: Array = cfg.get("cols", [0, 0])
+	var rows: Array = cfg.get("rows", [0, 0])
+	var c0 := int(cols[0]); var c1 := int(cols[1])
+	var r0 := int(rows[0]); var r1 := int(rows[1])
+	for row in range(r0, r1 + 1):
+		for col in range(c0, c1 + 1):
+			# scenario coords are odd-r offset; convert to axial for lookup.
+			var coord := Vector2i(col - (row >> 1), row)
+			var terr := hex_map.terrain_at(coord)
+			if terr == "" or hex_map.terrain_impassable(terr):
+				continue
+			_deploy_zone[coord] = true
+
+func _on_deploy_clicked(coord: Vector2i) -> void:
+	var clicked := hex_map.unit_at(coord)
+	# When already holding a unit, a click inside the zone places or swaps it.
+	if _deploy_pick != null and _deploy_zone.has(coord):
+		if clicked == _deploy_pick:
+			_set_deploy_pick(null)               # tap self to cancel
+			return
+		if clicked == null:
+			hex_map.relocate_unit(_deploy_pick, coord)
+		elif clicked.faction_id == player_faction:
+			_swap_units(_deploy_pick, clicked)
+		else:
+			return                               # enemy hex: keep holding
+		_set_deploy_pick(null)
+		_refresh_visibility()
+		hex_map.show_movement_range(_deploy_zone.keys())
+		return
+	# Otherwise, click one of your own units to pick it up.
+	if clicked != null and clicked.faction_id == player_faction:
+		_set_deploy_pick(clicked if clicked != _deploy_pick else null)
+		return
+	_set_deploy_pick(null)
+
+func _set_deploy_pick(u: Unit) -> void:
+	if _deploy_pick != null and is_instance_valid(_deploy_pick):
+		_deploy_pick.set_selected(false)
+	_deploy_pick = u
+	if u != null:
+		u.set_selected(true)
+		_flash_status("已選取 %s — 點藍色區域內的空格放置,或點另一支部隊互換。" % u.display_name)
+
+func _swap_units(a: Unit, b: Unit) -> void:
+	var a_coord := a.coord
+	var b_coord := b.coord
+	hex_map.unregister_unit(a)
+	hex_map.unregister_unit(b)
+	hex_map.relocate_unit(a, b_coord)
+	hex_map.relocate_unit(b, a_coord)
+
+func _build_deploy_bar() -> void:
+	var ui := $UI
+	_deploy_bar = Panel.new()
+	_deploy_bar.name = "DeployBar"
+	_deploy_bar.anchor_left = 0.5
+	_deploy_bar.anchor_right = 0.5
+	_deploy_bar.anchor_top = 1.0
+	_deploy_bar.anchor_bottom = 1.0
+	_deploy_bar.offset_left = -320
+	_deploy_bar.offset_right = 320
+	_deploy_bar.offset_top = -92
+	_deploy_bar.offset_bottom = -24
+	ui.add_child(_deploy_bar)
+
+	var margin := MarginContainer.new()
+	margin.anchor_right = 1.0
+	margin.anchor_bottom = 1.0
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 12)
+	_deploy_bar.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	var label := RichTextLabel.new()
+	label.bbcode_enabled = true
+	label.fit_content = true
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("normal_font_size", 15)
+	label.text = "[b]部署階段[/b]  點選你的部隊,再點藍色區域內的格子放置(點另一支部隊可互換位置)。"
+	vbox.add_child(label)
+
+	var start_button := Button.new()
+	start_button.text = "開始戰鬥 ▶"
+	start_button.pressed.connect(_finish_deploy)
+	vbox.add_child(start_button)
+
+func _finish_deploy() -> void:
+	_deploy_mode = false
+	_set_deploy_pick(null)
+	hex_map.clear_movement_range()
+	if _deploy_bar != null and is_instance_valid(_deploy_bar):
+		_deploy_bar.queue_free()
+	_deploy_bar = null
+	end_turn_button.visible = true
+	_setup_tutorial()
+	turn_manager.emit_initial()
 
 func _end_battle(w: String) -> void:
 	battle_over = true
