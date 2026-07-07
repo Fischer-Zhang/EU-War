@@ -50,6 +50,28 @@ def main():
     if len(scenario_files) < 5:
         errors.append(f"expected >= 5 scenarios, found {len(scenario_files)}")
 
+    # Tech tree (optional): prerequisites and applies_to must resolve.
+    techs_path = os.path.join(DATA, "techs.json")
+    techs = load(techs_path) if os.path.exists(techs_path) else {}
+    valid_mod_keys = {"attack", "defense", "vs_armor", "move", "vision"}
+    for tid, t in techs.items():
+        if not isinstance(t.get("cost"), int) or t.get("cost", 0) < 0:
+            errors.append(f"tech {tid}: missing/invalid non-negative int 'cost'")
+        for req in t.get("requires", []):
+            if req not in techs:
+                errors.append(f"tech {tid}: requires unknown tech '{req}'")
+        applies = t.get("applies_to", "all")
+        if applies != "all":
+            if not isinstance(applies, list):
+                errors.append(f"tech {tid}: applies_to must be \"all\" or a list")
+            else:
+                for ut in applies:
+                    if ut not in units:
+                        errors.append(f"tech {tid}: applies_to unknown unit '{ut}'")
+        for k in t.get("mods", {}):
+            if k not in valid_mod_keys:
+                errors.append(f"tech {tid}: unknown mod key '{k}'")
+
     scenario_ids = {load(os.path.join(scen_dir, fn)).get("id") for fn in scenario_files}
     campaigns_path = os.path.join(DATA, "campaigns.json")
     campaigns = load(campaigns_path) if os.path.exists(campaigns_path) else {}

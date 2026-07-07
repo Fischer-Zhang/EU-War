@@ -106,6 +106,7 @@ func _setup_scenario() -> void:
 			break
 	if player_faction == "":
 		player_faction = factions.keys()[0]
+	_apply_tech_bonuses()
 	# Objective marker from a capture victory condition.
 	var vic: Dictionary = scenario.get("victory", {}).get(player_faction, {})
 	if String(vic.get("type", "")) == "capture":
@@ -743,6 +744,24 @@ func _close_tutorial() -> void:
 
 # ------------------------------------------------------------------ deployment
 
+# Campaign tech tree: attach each unlocked tech's stat bonus to matching player
+# units as a persistent self-effect, which CombatModifiers.for_unit already folds
+# into attack/defense/vs_armor/move/vision. No-op outside a campaign.
+func _apply_tech_bonuses() -> void:
+	if not GameState.in_campaign() or GameState.unlocked_techs.is_empty():
+		return
+	for u in units:
+		if u.faction_id != player_faction:
+			continue
+		var mods: Dictionary = GameState.tech_mods_for(u.type_id)
+		var any := false
+		for k in mods.keys():
+			if int(mods[k]) != 0:
+				any = true
+				break
+		if any:
+			u.active_effects.append({"self_mods": mods})
+
 func _has_deployment() -> bool:
 	var dep: Dictionary = scenario.get("deployment", {})
 	return dep.has(player_faction)
@@ -870,6 +889,7 @@ func _end_battle(w: String) -> void:
 	# Campaign: banking survivors (with XP/rank) and advancing happens on a win.
 	if GameState.in_campaign() and player_won:
 		GameState.capture_roster(_living_units_of(player_faction))
+		GameState.award_research(GameState.RESEARCH_PER_WIN)
 		GameState.advance_campaign()
 	result_label.text = "勝利!" if player_won else "戰敗"
 	result_label.modulate = Color(0.4, 0.9, 0.4) if player_won else Color(0.9, 0.4, 0.4)

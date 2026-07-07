@@ -7,12 +7,14 @@ const UNITS_PATH := "res://data/units.json"
 const TERRAINS_PATH := "res://data/terrains.json"
 const GENERALS_PATH := "res://data/generals.json"
 const CAMPAIGNS_PATH := "res://data/campaigns.json"
+const TECHS_PATH := "res://data/techs.json"
 const SCENARIOS_DIR := "res://data/scenarios/"
 
 var units: Dictionary = {}
 var terrains: Dictionary = {}
 var generals: Dictionary = {}
 var campaigns: Dictionary = {}
+var techs: Dictionary = {}
 var scenarios: Array[Dictionary] = []
 
 func _ready() -> void:
@@ -20,9 +22,10 @@ func _ready() -> void:
 	terrains = _with_catalog_ids(_load_json(TERRAINS_PATH))
 	generals = _with_catalog_ids(_load_json(GENERALS_PATH))
 	campaigns = _with_catalog_ids(_load_json(CAMPAIGNS_PATH))
+	techs = _with_catalog_ids(_load_json(TECHS_PATH))
 	scenarios = _load_scenarios()
-	print("[DataLoader] loaded %d unit types, %d terrains, %d commanders, %d scenarios, %d campaigns" % [
-		units.size(), terrains.size(), generals.size(), scenarios.size(), campaigns.size(),
+	print("[DataLoader] loaded %d unit types, %d terrains, %d commanders, %d scenarios, %d campaigns, %d techs" % [
+		units.size(), terrains.size(), generals.size(), scenarios.size(), campaigns.size(), techs.size(),
 	])
 
 func get_campaign(campaign_id: String) -> Dictionary:

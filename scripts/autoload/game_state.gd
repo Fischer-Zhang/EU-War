@@ -14,6 +14,13 @@ var campaign_index: int = 0
 var campaign_roster: Array = []   # Array[Dictionary]: {type,name,xp,rank,general}
 var browsing_campaigns: bool = false   # select screen mode: campaigns vs scenarios
 
+# Tech tree (campaign-only): research points earned from victories are spent to
+# unlock army-wide upgrades that add stat modifiers to matching player units.
+const RESEARCH_START := 3
+const RESEARCH_PER_WIN := 3
+var research_points: int = 0
+var unlocked_techs: Array = []
+
 signal scenario_started(scenario_id: String)
 signal scenario_ended(winner: String, summary: Dictionary)
 
@@ -31,12 +38,16 @@ func start_campaign(id: String) -> void:
 	campaign_id = id
 	campaign_index = 0
 	campaign_roster = []
+	research_points = RESEARCH_START
+	unlocked_techs = []
 	current_scenario_id = current_campaign_scenario()
 
 func clear_campaign() -> void:
 	campaign_id = ""
 	campaign_index = 0
 	campaign_roster = []
+	research_points = 0
+	unlocked_techs = []
 
 func in_campaign() -> bool:
 	return campaign_id != ""
@@ -107,4 +118,51 @@ func apply_roster(scenario: Dictionary) -> Dictionary:
 			campaign_roster.size(), slots.size()])
 	var out := scenario.duplicate(true)
 	out["units"] = new_units
+	return out
+
+# ------------------------------------------------------------------ tech tree
+
+func award_research(points: int) -> void:
+	research_points += points
+
+func tech_unlocked(tech_id: String) -> bool:
+	return tech_id in unlocked_techs
+
+func tech_prereqs_met(tech_id: String) -> bool:
+	var t: Dictionary = DataLoader.techs.get(tech_id, {})
+	for req in t.get("requires", []):
+		if not (req in unlocked_techs):
+			return false
+	return true
+
+func tech_can_unlock(tech_id: String) -> bool:
+	if tech_id in unlocked_techs:
+		return false
+	var t: Dictionary = DataLoader.techs.get(tech_id, {})
+	if t.is_empty():
+		return false
+	if int(t.get("cost", 0)) > research_points:
+		return false
+	return tech_prereqs_met(tech_id)
+
+func unlock_tech(tech_id: String) -> bool:
+	if not tech_can_unlock(tech_id):
+		return false
+	research_points -= int(DataLoader.techs[tech_id].get("cost", 0))
+	unlocked_techs.append(tech_id)
+	return true
+
+# Aggregate additive stat modifiers from all unlocked techs that apply to a unit
+# type. Shape matches CombatModifiers: { attack, defense, vs_armor, move, vision }.
+func tech_mods_for(type_id: String) -> Dictionary:
+	var out := {"attack": 0, "defense": 0, "vs_armor": 0, "move": 0, "vision": 0}
+	for tid in unlocked_techs:
+		var t: Dictionary = DataLoader.techs.get(tid, {})
+		var applies = t.get("applies_to", "all")
+		var matches: bool = (applies is Array and type_id in applies) or (not (applies is Array) and String(applies) == "all")
+		if not matches:
+			continue
+		var m: Dictionary = t.get("mods", {})
+		for k in out.keys():
+			out[k] += int(m.get(k, 0))
 	return out

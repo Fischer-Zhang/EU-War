@@ -9,6 +9,7 @@ extends Control
 func _ready() -> void:
 	start_button.pressed.connect(_on_start_pressed)
 	back_button.pressed.connect(_on_back_pressed)
+	_add_tech_button()
 	var scenario := DataLoader.get_scenario(GameState.current_scenario_id)
 	if scenario.is_empty():
 		title_label.text = "(找不到作戰)"
@@ -20,6 +21,16 @@ func _ready() -> void:
 	era_label.text = String(scenario.get("era", ""))
 	body.text = _compose(scenario)
 	start_button.grab_focus()
+
+# In a campaign, offer a research screen (built at runtime) beside Start/Back.
+func _add_tech_button() -> void:
+	if not GameState.in_campaign() or DataLoader.techs.is_empty():
+		return
+	var btn := Button.new()
+	btn.text = "科技研發 (%d 點)" % GameState.research_points
+	btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/tech_screen.tscn"))
+	start_button.get_parent().add_child(btn)
+	btn.get_parent().move_child(btn, start_button.get_index())
 
 func _campaign_header() -> String:
 	if not GameState.in_campaign():
