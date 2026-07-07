@@ -1,5 +1,9 @@
 # Eu-War 歐陸烽火
 
+[![CI](https://github.com/Fischer-Zhang/EU-War/actions/workflows/ci.yml/badge.svg)](https://github.com/Fischer-Zhang/EU-War/actions/workflows/ci.yml)
+
+🎮 **[線上試玩](https://fischer-zhang.github.io/EU-War/)** — 瀏覽器直接遊玩(Web 匯出)
+
 以 **Godot 4 / GDScript** 打造的回合制歐洲戰爭六角格戰棋,聚焦 **14–18 世紀**:百年戰爭的長弓與騎士、義大利戰爭的火繩槍方陣、三十年戰爭的線列火槍與野砲、路易十四與大北方戰爭的騎兵突擊。
 
 架構與開發流程參考姊妹專案 **WorldWarII**:決定性六角戰鬥、資料驅動的兵種/地形/劇本、無頭 GDScript 測試與靜態資料驗證。

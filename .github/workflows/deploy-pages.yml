@@ -1,0 +1,70 @@
+name: Deploy Web to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow the workflow to publish to GitHub Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One live deploy at a time; let an in-progress run finish (don't cancel a
+# publish midway).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Export web build
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.2.2"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          install -m 0755 "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          mv templates/* "$dest/"
+
+      - name: Import resources
+        run: godot --headless --path . --import
+
+      - name: Export Web build
+        run: |
+          set -euo pipefail
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html
+          # Cross-origin isolation shim so SharedArrayBuffer works on Pages.
+          cp web/coi-serviceworker.js build/web/coi-serviceworker.js
+          ls -la build/web
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    name: Deploy to Pages
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
