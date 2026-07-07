@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Fast checks — no Godot needed: engine-pin gate, JSON syntax, Python
+  # compile, static data validator. Fails fast on data/config drift.
+  fast:
+    name: Fast validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Run validate_fast.sh
+        run: tools/validate_fast.sh
+
+  # Full suite — installs headless Godot 4.2.2 (matching the pinned engine),
+  # imports resources once, then runs the GDScript test suite.
+  tests:
+    name: Headless GDScript tests
+    runs-on: ubuntu-latest
+    needs: fast
+    env:
+      GODOT_VERSION: "4.2.2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} (headless)
+        run: |
+          set -euo pipefail
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fsSL -o godot.zip "$url"
+          unzip -q godot.zip
+          install -m 0755 "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      - name: Import resources
+        run: godot --headless --path . --import
+
+      - name: Run test suite
+        run: tools/validate.sh
