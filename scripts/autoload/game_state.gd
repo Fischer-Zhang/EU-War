@@ -12,6 +12,7 @@ var difficulty: String = "normal"  # "easy" | "normal" | "hard"
 var campaign_id: String = ""
 var campaign_index: int = 0
 var campaign_roster: Array = []   # Array[Dictionary]: {type,name,xp,rank,general}
+var browsing_campaigns: bool = false   # select screen mode: campaigns vs scenarios
 
 signal scenario_started(scenario_id: String)
 signal scenario_ended(winner: String, summary: Dictionary)

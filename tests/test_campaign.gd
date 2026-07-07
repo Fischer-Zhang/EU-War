@@ -98,6 +98,19 @@ func _run() -> void:
 	gs.clear_campaign()
 	ok(not gs.in_campaign(), "clear_campaign resets state")
 
+	# The shared select screen lists every campaign in campaign-browse mode.
+	gs.browsing_campaigns = true
+	var sel = load("res://scenes/scenario_select.tscn").instantiate()
+	root.add_child(sel)
+	await process_frame
+	await process_frame
+	var list_node = sel.get_node("Margin/VBox/ListScroll/List")
+	ok(list_node.get_child_count() == dl.campaigns.size(),
+		"campaign select lists all %d campaigns" % dl.campaigns.size())
+	sel.queue_free()
+	await process_frame
+	gs.browsing_campaigns = false
+
 	if fails == 0:
 		print("test_campaign: ok")
 		quit(0)

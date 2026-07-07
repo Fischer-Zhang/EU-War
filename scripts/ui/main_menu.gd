@@ -26,13 +26,12 @@ func _add_campaign_button() -> void:
 
 func _on_single_battle_pressed() -> void:
 	GameState.clear_campaign()
+	GameState.browsing_campaigns = false
 	get_tree().change_scene_to_file("res://scenes/scenario_select.tscn")
 
 func _on_campaign_pressed() -> void:
-	# One campaign for now — start it directly and go to the first briefing.
-	var ids := DataLoader.campaigns.keys()
-	GameState.start_campaign(String(ids[0]))
-	get_tree().change_scene_to_file("res://scenes/briefing.tscn")
+	GameState.browsing_campaigns = true
+	get_tree().change_scene_to_file("res://scenes/scenario_select.tscn")
 
 func _on_quit_pressed() -> void:
 	get_tree().quit()
