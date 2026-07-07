@@ -175,8 +175,8 @@ func _run_ai_turn(faction_id: String) -> void:
 		if order == null:
 			continue
 		if order.path.size() >= 2:
-			hex_map.move_unit_along_path(u, order.path)
-			await get_tree().create_timer(0.18).timeout
+			var move_dur := hex_map.move_unit_along_path(u, order.path)
+			await get_tree().create_timer(move_dur + 0.06).timeout
 			await _resolve_brace_reactions(u)
 			if not u.is_alive():
 				continue
@@ -201,8 +201,8 @@ func _auto_withdraw_routed(faction_id: String) -> void:
 		var occ := _occupancy()
 		var away := _step_away_from_enemies(u)
 		if away != u.coord and not occ.has(away) and not hex_map.terrain_impassable(hex_map.terrain_at(away)):
-			hex_map.move_unit_along_path(u, [u.coord, away])
-			await get_tree().create_timer(0.1).timeout
+			var move_dur := hex_map.move_unit_along_path(u, [u.coord, away])
+			await get_tree().create_timer(move_dur).timeout
 		u.has_attacked = true
 
 func _step_away_from_enemies(u: Unit) -> Vector2i:
@@ -418,8 +418,8 @@ func _move_selected(coord: Vector2i) -> void:
 	if path.size() < 2:
 		return
 	var mover := selected_unit
-	hex_map.move_unit_along_path(mover, path)
-	await get_tree().create_timer(0.18).timeout
+	var move_dur := hex_map.move_unit_along_path(mover, path)
+	await get_tree().create_timer(move_dur + 0.06).timeout
 	await _resolve_brace_reactions(mover)
 	_notify_tutorial("move")
 	_refresh_visibility()

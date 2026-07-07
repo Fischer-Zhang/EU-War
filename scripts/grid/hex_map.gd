@@ -199,9 +199,15 @@ func relocate_unit(unit: Unit, dest: Vector2i) -> void:
 	unit.position = HexCoord.to_pixel(dest, HEX_SIZE)
 	unit.queue_redraw()
 
-func move_unit_along_path(unit: Unit, path: Array) -> void:
+const STEP_DURATION := 0.12  # seconds per hex of the move animation
+
+# Animates `unit` along `path` and returns the total animation duration so the
+# caller can await the FULL move before starting the next action. Awaiting a
+# fixed time shorter than the tween strands the node between hexes (its drawn
+# position stops matching its logical coord). coord/occupancy update instantly.
+func move_unit_along_path(unit: Unit, path: Array) -> float:
 	if path.size() < 2:
-		return
+		return 0.0
 	var dest: Vector2i = path[-1]
 	occupants.erase(unit.coord)
 	occupants[dest] = unit
@@ -211,9 +217,10 @@ func move_unit_along_path(unit: Unit, path: Array) -> void:
 	tween.set_trans(Tween.TRANS_LINEAR)
 	for i in range(1, path.size()):
 		var step: Vector2i = path[i]
-		tween.tween_property(unit, "position", HexCoord.to_pixel(step, HEX_SIZE), 0.12)
+		tween.tween_property(unit, "position", HexCoord.to_pixel(step, HEX_SIZE), STEP_DURATION)
 	unit.moved.emit(dest)
 	unit.queue_redraw()
+	return STEP_DURATION * float(path.size() - 1)
 
 func place_wreckage(coord: Vector2i, faction_color: Color) -> void:
 	var holder := Node2D.new()
