@@ -17,7 +17,7 @@ func _init() -> void:
 	_run.call_deferred()
 
 func _run() -> void:
-	root.get_node("GameState").current_scenario_id = "07_sandbox"
+	root.get_node("GameState").current_scenario_id = "10_sandbox"
 	var b = load("res://scenes/battle.tscn").instantiate()
 	root.add_child(b)
 	for _i in range(10):

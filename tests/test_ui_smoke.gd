@@ -36,7 +36,7 @@ func _run() -> void:
 
 	# Drive an AI turn on a Hard difficulty battle so the AIController path runs.
 	gs.difficulty = "hard"
-	gs.current_scenario_id = "01_crecy_1346"
+	gs.current_scenario_id = "02_crecy_1346"
 	var battle = load("res://scenes/battle.tscn").instantiate()
 	root.add_child(battle)
 	for _i in range(20):

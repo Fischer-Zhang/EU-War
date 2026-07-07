@@ -33,7 +33,7 @@ func _run() -> void:
 	var gs = root.get_node("GameState")
 	gs.clear_campaign()
 	gs.difficulty = "hard"                 # aggressive: charges then attacks
-	gs.current_scenario_id = "07_sandbox"  # both sides have units at mid-distance
+	gs.current_scenario_id = "10_sandbox"  # both sides have units at mid-distance
 	var b = load("res://scenes/battle.tscn").instantiate()
 	root.add_child(b)
 	for _i in range(10):
