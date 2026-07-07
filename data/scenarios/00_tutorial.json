@@ -36,9 +36,9 @@
     { "faction": "blue", "type": "men_at_arms",    "name": "重步兵", "at": [2, 4] },
     { "faction": "blue", "type": "heavy_cavalry",  "name": "騎士",   "at": [1, 5] },
     { "faction": "blue", "type": "pikemen",        "name": "長矛兵", "at": [2, 2] },
-    { "faction": "red",  "type": "crossbowmen",    "name": "敵弩兵", "at": [12, 3] },
-    { "faction": "red",  "type": "men_at_arms",    "name": "敵步兵", "at": [11, 4] },
-    { "faction": "red",  "type": "light_cavalry",  "name": "敵輕騎", "at": [12, 5] }
+    { "faction": "red",  "type": "crossbowmen",    "name": "敵弩兵", "at": [6, 2] },
+    { "faction": "red",  "type": "men_at_arms",    "name": "敵步兵", "at": [8, 4] },
+    { "faction": "red",  "type": "light_cavalry",  "name": "敵輕騎", "at": [8, 5] }
   ],
   "victory": {
     "blue": { "type": "eliminate", "by_turn": 99 },
