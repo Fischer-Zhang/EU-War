@@ -336,7 +336,9 @@ func _on_hex_clicked(coord: Vector2i, _terrain_id: String) -> void:
 	var clicked := hex_map.unit_at(coord)
 	# Attack: clicked an enemy that's a current target.
 	if selected_unit != null and clicked != null and clicked in attack_targets:
+		var atk_dist := HexCoord.distance(selected_unit.coord, clicked.coord)
 		await _perform_attack(selected_unit, clicked)
+		_notify_tutorial("attack_melee" if atk_dist <= 1 else "attack_ranged")
 		_deselect()
 		return
 	# Select own ready unit.
@@ -360,6 +362,7 @@ func _select(u: Unit) -> void:
 	_recompute_targets()
 	_update_selected_panel()
 	_update_action_buttons()
+	_notify_tutorial("select")
 
 func _deselect() -> void:
 	if selected_unit != null:
@@ -404,6 +407,7 @@ func _move_selected(coord: Vector2i) -> void:
 	hex_map.move_unit_along_path(mover, path)
 	await get_tree().create_timer(0.18).timeout
 	await _resolve_brace_reactions(mover)
+	_notify_tutorial("move")
 	_refresh_visibility()
 	if mover.is_alive() and selected_unit == mover:
 		_recompute_targets()
@@ -417,6 +421,7 @@ func _on_entrench_pressed() -> void:
 		return
 	selected_unit.entrench()
 	_flash_status("%s 構築工事。" % selected_unit.display_name)
+	_notify_tutorial("entrench")
 	_deselect()
 
 func _on_brace_pressed() -> void:
@@ -426,6 +431,7 @@ func _on_brace_pressed() -> void:
 	selected_unit.has_moved = true
 	selected_unit.has_attacked = true
 	_flash_status("%s 進入嚴陣以待。" % selected_unit.display_name)
+	_notify_tutorial("brace")
 	_deselect()
 
 func _on_rally_pressed() -> void:
@@ -435,6 +441,7 @@ func _on_rally_pressed() -> void:
 		return
 	var recovered := selected_unit.rally(_terrain_def(selected_unit.coord))
 	_flash_status("%s 整隊 (壓制 -%d)。" % [selected_unit.display_name, recovered])
+	_notify_tutorial("rally")
 	_deselect()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -671,9 +678,28 @@ func _show_tip() -> void:
 	if _hint_label == null:
 		return
 	var total := _tips.size()
-	_hint_label.text = "[color=#8fb7e0]教學 %d/%d[/color]\n\n%s" % [
-		_tip_index + 1, total, String(_tips[_tip_index])]
-	_hint_next_button.text = "開始 ✓" if _tip_index >= total - 1 else "下一步 ▶"
+	var tip = _tips[_tip_index]
+	var has_trigger := _tip_trigger(tip) != null
+	var header := "[color=#8fb7e0]教學 %d/%d[/color]" % [_tip_index + 1, total]
+	if has_trigger:
+		header += "  [color=#e0c060]· 換你操作[/color]"
+	_hint_label.text = "%s\n\n%s" % [header, _tip_text(tip)]
+	if _tip_index >= total - 1:
+		_hint_next_button.text = "開始 ✓"
+	elif has_trigger:
+		_hint_next_button.text = "略過此步 ›"
+	else:
+		_hint_next_button.text = "下一步 ▶"
+
+func _tip_text(tip) -> String:
+	if typeof(tip) == TYPE_DICTIONARY:
+		return String(tip.get("text", ""))
+	return String(tip)
+
+func _tip_trigger(tip):
+	if typeof(tip) == TYPE_DICTIONARY:
+		return tip.get("advance_on", null)
+	return null
 
 func _advance_tip() -> void:
 	if _tip_index >= _tips.size() - 1:
@@ -681,6 +707,18 @@ func _advance_tip() -> void:
 		return
 	_tip_index += 1
 	_show_tip()
+
+# Called from player action handlers. If the current tip is waiting on this
+# action, advance to the next tip automatically.
+func _notify_tutorial(event: String) -> void:
+	if _hint_panel == null or _tips.is_empty():
+		return
+	var trig = _tip_trigger(_tips[_tip_index])
+	if trig == null:
+		return
+	var matched: bool = (event in trig) if typeof(trig) == TYPE_ARRAY else (String(trig) == event)
+	if matched:
+		_advance_tip()
 
 func _close_tutorial() -> void:
 	if _hint_panel != null and is_instance_valid(_hint_panel):
