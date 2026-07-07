@@ -76,6 +76,7 @@ func _ready() -> void:
 	scenario = DataLoader.get_scenario(sid)
 	if scenario.is_empty():
 		scenario = DataLoader.get_scenario(DEFAULT_SCENARIO)
+	scenario = GameState.apply_roster(scenario)
 	_setup_scenario()
 	_connect_ui()
 	turn_manager = TurnManager.new()
@@ -118,7 +119,7 @@ func _connect_ui() -> void:
 	entrench_button.pressed.connect(_on_entrench_pressed)
 	brace_button.pressed.connect(_on_brace_pressed)
 	rally_button.pressed.connect(_on_rally_pressed)
-	menu_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/scenario_select.tscn"))
+	menu_button.pressed.connect(_on_result_button)
 	result_panel.visible = false
 	_update_action_buttons()
 
@@ -866,6 +867,10 @@ func _end_battle(w: String) -> void:
 	_deselect()
 	_close_tutorial()
 	var player_won := w == player_faction
+	# Campaign: banking survivors (with XP/rank) and advancing happens on a win.
+	if GameState.in_campaign() and player_won:
+		GameState.capture_roster(_living_units_of(player_faction))
+		GameState.advance_campaign()
 	result_label.text = "勝利!" if player_won else "戰敗"
 	result_label.modulate = Color(0.4, 0.9, 0.4) if player_won else Color(0.9, 0.4, 0.4)
 	var lines := []
@@ -873,6 +878,36 @@ func _end_battle(w: String) -> void:
 	lines.append("")
 	for fid in factions.keys():
 		lines.append("%s 存活部隊:%d" % [_faction_name(fid), _living_units_of(fid).size()])
+	if GameState.in_campaign():
+		lines.append("")
+		if player_won and GameState.campaign_complete():
+			lines.append("[color=#e0c060]戰役全數達成![/color]")
+		elif player_won:
+			lines.append("倖存部隊已編入下一場,保留老兵經驗。")
+		else:
+			lines.append("再接再厲——可重試本場。")
 	result_summary.text = "\n".join(lines)
+	menu_button.text = _result_button_text(player_won)
 	result_panel.visible = true
 	GameState.end_scenario(w, {"winner": w})
+
+func _result_button_text(player_won: bool) -> String:
+	if not GameState.in_campaign():
+		return "返回列表"
+	if player_won and GameState.campaign_complete():
+		return "戰役完成 · 返回主選單"
+	if player_won:
+		return "下一場 ▶"
+	return "重試本場"
+
+func _on_result_button() -> void:
+	if GameState.in_campaign():
+		if winner == player_faction and GameState.campaign_complete():
+			GameState.clear_campaign()
+			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		else:
+			# Next battle on a win (index already advanced), or retry on a loss;
+			# either way current_scenario_id points at the scenario to load.
+			get_tree().change_scene_to_file("res://scenes/briefing.tscn")
+		return
+	get_tree().change_scene_to_file("res://scenes/scenario_select.tscn")

@@ -6,21 +6,27 @@ extends Node
 const UNITS_PATH := "res://data/units.json"
 const TERRAINS_PATH := "res://data/terrains.json"
 const GENERALS_PATH := "res://data/generals.json"
+const CAMPAIGNS_PATH := "res://data/campaigns.json"
 const SCENARIOS_DIR := "res://data/scenarios/"
 
 var units: Dictionary = {}
 var terrains: Dictionary = {}
 var generals: Dictionary = {}
+var campaigns: Dictionary = {}
 var scenarios: Array[Dictionary] = []
 
 func _ready() -> void:
 	units = _with_catalog_ids(_load_json(UNITS_PATH))
 	terrains = _with_catalog_ids(_load_json(TERRAINS_PATH))
 	generals = _with_catalog_ids(_load_json(GENERALS_PATH))
+	campaigns = _with_catalog_ids(_load_json(CAMPAIGNS_PATH))
 	scenarios = _load_scenarios()
-	print("[DataLoader] loaded %d unit types, %d terrains, %d commanders, %d scenarios" % [
-		units.size(), terrains.size(), generals.size(), scenarios.size(),
+	print("[DataLoader] loaded %d unit types, %d terrains, %d commanders, %d scenarios, %d campaigns" % [
+		units.size(), terrains.size(), generals.size(), scenarios.size(), campaigns.size(),
 	])
+
+func get_campaign(campaign_id: String) -> Dictionary:
+	return campaigns.get(campaign_id, {})
 
 func get_unit_def(type_id: String) -> Dictionary:
 	if not units.has(type_id):

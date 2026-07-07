@@ -50,6 +50,17 @@ def main():
     if len(scenario_files) < 5:
         errors.append(f"expected >= 5 scenarios, found {len(scenario_files)}")
 
+    scenario_ids = {load(os.path.join(scen_dir, fn)).get("id") for fn in scenario_files}
+    campaigns_path = os.path.join(DATA, "campaigns.json")
+    campaigns = load(campaigns_path) if os.path.exists(campaigns_path) else {}
+    for cid, c in campaigns.items():
+        scens = c.get("scenarios", [])
+        if not scens:
+            errors.append(f"campaign {cid}: empty scenario list")
+        for sid in scens:
+            if sid not in scenario_ids:
+                errors.append(f"campaign {cid}: unknown scenario '{sid}'")
+
     for fn in scenario_files:
         s = load(os.path.join(scen_dir, fn))
         sid = s.get("id", fn)

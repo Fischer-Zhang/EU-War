@@ -13,13 +13,26 @@ func _ready() -> void:
 	if scenario.is_empty():
 		title_label.text = "(找不到作戰)"
 		return
+	# In a campaign, the player force is the carried roster, not the scenario's
+	# default one — reflect that in the order of battle shown here.
+	scenario = GameState.apply_roster(scenario)
 	title_label.text = String(scenario.get("title", ""))
 	era_label.text = String(scenario.get("era", ""))
 	body.text = _compose(scenario)
 	start_button.grab_focus()
 
+func _campaign_header() -> String:
+	if not GameState.in_campaign():
+		return ""
+	var camp := DataLoader.get_campaign(GameState.campaign_id)
+	var total: int = GameState.campaign_scenarios().size()
+	return "[b]戰役:%s[/b]  第 %d / %d 場\n\n" % [
+		String(camp.get("title", "")), GameState.campaign_index + 1, total]
+
 func _compose(scenario: Dictionary) -> String:
 	var lines := []
+	if GameState.in_campaign():
+		lines.append(_campaign_header())
 	lines.append(String(scenario.get("briefing", "")))
 	lines.append("")
 	# Faction order of battle.
@@ -47,4 +60,8 @@ func _on_start_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/battle.tscn")
 
 func _on_back_pressed() -> void:
+	if GameState.in_campaign():
+		GameState.clear_campaign()
+		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		return
 	get_tree().change_scene_to_file("res://scenes/scenario_select.tscn")
