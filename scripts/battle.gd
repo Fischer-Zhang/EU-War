@@ -800,7 +800,8 @@ func _on_hex_hovered(coord: Vector2i, terrain_id: String) -> void:
 			DataLoader.get_unit_def(selected_unit.type_id), DataLoader.get_unit_def(u.type_id),
 			DataLoader.get_general_def(selected_unit.general_id), DataLoader.get_general_def(u.general_id),
 			_terrain_def(selected_unit.coord), _terrain_def(u.coord),
-			_visible_for(player_faction), hex_map)
+			_visible_for(player_faction), hex_map,
+			_living_units(), DataLoader.units, DataLoader.terrains, DataLoader.generals)
 		status_label.text = DamagePreview.summary(p, selected_unit, u)
 		return
 	if u != null and u.visible:
