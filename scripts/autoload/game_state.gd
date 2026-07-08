@@ -270,16 +270,30 @@ var conquest_secured: Dictionary = {}     # territory_id -> true (held off a cou
 var conquest_battle: Dictionary = {}      # current battle {territory, defense:bool}
 var conquest_enemy_target: String = ""    # queued enemy counter-attack to defend
 # Strategic economy: owned territories earn strength each round, spent on a
-# global army level (+attack in battles) or fortifying frontier regions
-# (defenders entrench when you hold them).
+# global army level (+attack in battles), fortifying frontier regions (defenders
+# entrench when you hold them), development tracks (permanent army-wide edges),
+# or one-shot pre-battle preparations that shape the NEXT battle's opening.
 const CONQ_START_STRENGTH := 3
 const CONQ_MUSTER_COST := 4
 const CONQ_FORTIFY_COST := 2
 const CONQ_ARMY_MAX := 3
 const CONQ_FORTIFY_MAX := 3
+# Development tracks (global, permanent): industry lifts strength income; the
+# training academy gives units that fight from here a veteran head start.
+const CONQ_INDUSTRY_COST := 3
+const CONQ_INDUSTRY_MAX := 3
+const CONQ_TRAINING_COST := 4
+const CONQ_TRAINING_MAX := 2
+const CONQ_TRAIN_XP := 3                   # start XP granted per training level
+# Pre-battle preparations (one-shot, consumed by the next battle): recon grants
+# army-wide vision, barrage softens the enemy, supply digs your troops in.
+const CONQ_PREP_COST := {"recon": 2, "barrage": 3, "supply": 2}
 var conquest_strength: int = 0
 var conquest_fortify: Dictionary = {}     # territory_id -> fortify level
 var conquest_army: int = 0
+var conquest_industry: int = 0
+var conquest_training: int = 0
+var conquest_prep: Dictionary = {}        # prep kind -> true, for the pending battle
 
 func start_conquest(id: String) -> void:
 	conquest_id = id
@@ -290,6 +304,9 @@ func start_conquest(id: String) -> void:
 	conquest_strength = CONQ_START_STRENGTH
 	conquest_fortify = {}
 	conquest_army = 0
+	conquest_industry = 0
+	conquest_training = 0
+	conquest_prep = {}
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", "enemy"))
 
@@ -302,6 +319,9 @@ func clear_conquest() -> void:
 	conquest_strength = 0
 	conquest_fortify = {}
 	conquest_army = 0
+	conquest_industry = 0
+	conquest_training = 0
+	conquest_prep = {}
 
 func in_conquest() -> bool:
 	return conquest_id != ""
@@ -379,6 +399,7 @@ func resolve_conquest_battle(player_won: bool) -> void:
 	var tid := String(conquest_battle.get("territory", ""))
 	var defense: bool = bool(conquest_battle.get("defense", false))
 	conquest_battle = {}
+	conquest_prep = {}   # pre-battle preparations are spent by the fought battle
 	if tid == "":
 		return
 	if defense:
@@ -411,13 +432,13 @@ func conquest_counts() -> Dictionary:
 			player += 1
 	return {"player": player, "total": total}
 
-# Strength earned per round: one per owned territory.
+# Strength earned per round: one per owned territory, plus industry development.
 func conquest_income() -> int:
 	var n := 0
 	for tid in conquest_owner:
 		if String(conquest_owner[tid]) == "player":
 			n += 1
-	return n
+	return n + conquest_industry
 
 func can_muster() -> bool:
 	return in_conquest() and conquest_army < CONQ_ARMY_MAX and conquest_strength >= CONQ_MUSTER_COST
@@ -445,3 +466,51 @@ func fortify(tid: String) -> bool:
 
 func conquest_fortify_level(tid: String) -> int:
 	return int(conquest_fortify.get(tid, 0))
+
+# --- Development tracks (global, permanent) ---
+
+func _develop_state(track: String) -> Array:
+	# [current level, cost, max] for a development track, or [] if unknown.
+	match track:
+		"industry": return [conquest_industry, CONQ_INDUSTRY_COST, CONQ_INDUSTRY_MAX]
+		"training": return [conquest_training, CONQ_TRAINING_COST, CONQ_TRAINING_MAX]
+	return []
+
+func can_develop(track: String) -> bool:
+	var s := _develop_state(track)
+	if s.is_empty() or not in_conquest():
+		return false
+	return int(s[0]) < int(s[2]) and conquest_strength >= int(s[1])
+
+func develop(track: String) -> bool:
+	if not can_develop(track):
+		return false
+	var s := _develop_state(track)
+	conquest_strength -= int(s[1])
+	match track:
+		"industry": conquest_industry += 1
+		"training": conquest_training += 1
+	return true
+
+func develop_level(track: String) -> int:
+	var s := _develop_state(track)
+	return int(s[0]) if not s.is_empty() else 0
+
+# --- Pre-battle preparations (one-shot, applied to the next battle) ---
+
+func can_prepare(kind: String) -> bool:
+	if not in_conquest() or not CONQ_PREP_COST.has(kind):
+		return false
+	if bool(conquest_prep.get(kind, false)):
+		return false   # already bought for the pending battle
+	return conquest_strength >= int(CONQ_PREP_COST[kind])
+
+func prepare(kind: String) -> bool:
+	if not can_prepare(kind):
+		return false
+	conquest_strength -= int(CONQ_PREP_COST[kind])
+	conquest_prep[kind] = true
+	return true
+
+func prep_active(kind: String) -> bool:
+	return bool(conquest_prep.get(kind, false))

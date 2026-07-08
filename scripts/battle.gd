@@ -973,17 +973,33 @@ func _apply_conquest_bonuses() -> void:
 	if not GameState.in_conquest():
 		return
 	var army: int = GameState.conquest_army
+	var training: int = GameState.conquest_training
 	var defense: bool = bool(GameState.conquest_battle.get("defense", false))
 	var fort := 0
 	if defense:
 		fort = GameState.conquest_fortify_level(String(GameState.conquest_battle.get("territory", "")))
+	# Pre-battle preparations (one-shot). Recon/supply help the player; barrage
+	# softens the enemy before contact.
+	var recon: bool = GameState.prep_active("recon")
+	var supply: bool = GameState.prep_active("supply")
+	var barrage: bool = GameState.prep_active("barrage")
 	for u in units:
-		if u.faction_id != player_faction:
-			continue
-		if army > 0:
-			u.active_effects.append({"self_mods": {"attack": army}})
-		if fort > 0:
-			u.dig_in_level = max(u.dig_in_level, min(fort, Unit.MAX_DIG_IN))
+		if u.faction_id == player_faction:
+			if army > 0:
+				u.active_effects.append({"self_mods": {"attack": army}})
+			if training > 0:
+				u.gain_xp(training * GameState.CONQ_TRAIN_XP)   # veteran head start
+			if fort > 0:
+				u.dig_in_level = max(u.dig_in_level, min(fort, Unit.MAX_DIG_IN))
+			if recon:
+				u.active_effects.append({"self_mods": {"vision": 1}})
+			if supply:
+				u.dig_in_level = min(Unit.MAX_DIG_IN, u.dig_in_level + 1)
+				u.morale = u.morale_max
+		elif barrage:
+			# Softening barrage: suppress and lightly wound each enemy up front.
+			u.add_suppression(3)
+			u.take_damage(2)
 
 func _has_deployment() -> bool:
 	var dep: Dictionary = scenario.get("deployment", {})

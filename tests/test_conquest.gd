@@ -118,10 +118,29 @@ func _run() -> void:
 	ok(gs.muster(), "muster succeeds")
 	ok(gs.conquest_army == 1, "muster raises army level")
 
-	# Battle bonuses: defending a fortified region entrenches units and the army
-	# level adds attack — verify on real units in a conquest defense battle.
+	# Development tracks: industry lifts income, training banks a head start.
+	gs.conquest_strength = 20
+	var inc_before = gs.conquest_income()
+	ok(gs.develop("industry"), "develop industry succeeds")
+	ok(gs.conquest_industry == 1 and gs.conquest_income() == inc_before + 1, "industry raises income")
+	ok(gs.develop("training"), "develop training succeeds")
+	ok(gs.conquest_training == 1, "training level raised")
+	ok(not gs.can_develop("training") or gs.conquest_training < gs.CONQ_TRAINING_MAX, "training respects its cap")
+
+	# Pre-battle preparations: cost strength, one-shot, no double-buy.
+	var s_before = gs.conquest_strength
+	ok(gs.prepare("barrage"), "buy barrage prep")
+	ok(gs.prep_active("barrage") and gs.conquest_strength == s_before - int(gs.CONQ_PREP_COST["barrage"]),
+		"prep spends strength and becomes active")
+	ok(not gs.prepare("barrage"), "cannot buy the same prep twice")
+
+	# Battle bonuses: defending a fortified region entrenches units, the army
+	# level adds attack, training banks XP, and a barrage prep softens the enemy —
+	# verify on real units in a conquest defense battle.
 	gs.conquest_army = 2
 	gs.conquest_fortify["normandy"] = 2
+	gs.conquest_training = 1
+	gs.conquest_prep = {"barrage": true}
 	gs.conquest_enemy_target = "normandy"
 	gs.begin_conquest_defense()
 	var b = load("res://scenes/battle.tscn").instantiate()
@@ -129,10 +148,13 @@ func _run() -> void:
 	for _i in range(10):
 		await process_frame
 	var sample = null
+	var enemy_sample = null
 	for u in b.units:
 		if u.faction_id == b.player_faction:
-			sample = u
-			break
+			if sample == null:
+				sample = u
+		elif enemy_sample == null:
+			enemy_sample = u
 	ok(sample != null and sample.dig_in_level >= 2, "fortify entrenches defenders (dig-in %d)" % (sample.dig_in_level if sample else -1))
 	var has_army_buff := false
 	if sample != null:
@@ -140,6 +162,12 @@ func _run() -> void:
 			if int(e.get("self_mods", {}).get("attack", 0)) >= 2:
 				has_army_buff = true
 	ok(has_army_buff, "army level adds attack to player units")
+	ok(sample != null and sample.xp >= gs.CONQ_TRAIN_XP, "training grants start XP (xp %d)" % (sample.xp if sample else -1))
+	ok(enemy_sample != null and (enemy_sample.suppression > 0 or enemy_sample.hp < enemy_sample.max_hp),
+		"barrage prep softens the enemy (supp %d, hp %d/%d)" % [
+			enemy_sample.suppression if enemy_sample else -1,
+			enemy_sample.hp if enemy_sample else -1,
+			enemy_sample.max_hp if enemy_sample else -1])
 	b.queue_free()
 	await process_frame
 

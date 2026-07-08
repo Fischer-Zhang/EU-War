@@ -49,31 +49,45 @@ func _ready() -> void:
 
 	# Economy header.
 	var econ := Label.new()
-	econ.add_theme_font_size_override("font_size", 16)
-	econ.position = Vector2(28, 84)
-	econ.text = "國力 %d  ·  軍備 Lv %d  ·  每回合 +%d" % [
-		GameState.conquest_strength, GameState.conquest_army, GameState.conquest_income()]
+	econ.add_theme_font_size_override("font_size", 15)
+	econ.position = Vector2(28, 82)
+	econ.text = "國力 %d  ·  每回合 +%d  ·  軍備 Lv%d  ·  工業 Lv%d  ·  訓練 Lv%d" % [
+		GameState.conquest_strength, GameState.conquest_income(),
+		GameState.conquest_army, GameState.conquest_industry, GameState.conquest_training]
 	add_child(econ)
 
-	var muster := Button.new()
-	muster.text = "整軍 (軍備+1,費 %d)" % GameState.CONQ_MUSTER_COST
-	muster.position = Vector2(300, 80)
-	muster.custom_minimum_size = Vector2(220, 30)
-	muster.disabled = (under_attack != "") or not GameState.can_muster()
-	muster.pressed.connect(_muster)
-	add_child(muster)
-
-	var back := Button.new()
-	back.text = "返回主選單"
-	back.position = Vector2(540, 80)
-	back.custom_minimum_size = Vector2(140, 30)
-	back.pressed.connect(func():
+	# Row 1: army investments (disabled while defending a counter, like before).
+	var busy := (under_attack != "")
+	_econ_button("整軍 軍備+1 (費%d)" % GameState.CONQ_MUSTER_COST, Vector2(28, 108), Vector2(180, 30),
+		busy or not GameState.can_muster(), _muster)
+	_econ_button("工業 收入+1 (費%d)" % GameState.CONQ_INDUSTRY_COST, Vector2(214, 108), Vector2(180, 30),
+		busy or not GameState.can_develop("industry"), _develop.bind("industry"))
+	_econ_button("訓練所 老兵 (費%d)" % GameState.CONQ_TRAINING_COST, Vector2(400, 108), Vector2(180, 30),
+		busy or not GameState.can_develop("training"), _develop.bind("training"))
+	_econ_button("返回主選單", Vector2(586, 108), Vector2(130, 30), false, func():
 		GameState.clear_conquest()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
-	add_child(back)
+
+	# Row 2: one-shot pre-battle preparations for the NEXT battle.
+	var prep_lbl := Label.new()
+	prep_lbl.add_theme_font_size_override("font_size", 14)
+	prep_lbl.position = Vector2(28, 144)
+	prep_lbl.text = "戰前準備(下場戰鬥生效):"
+	prep_lbl.modulate = Color(0.78, 0.82, 0.86)
+	add_child(prep_lbl)
+	var preps := [
+		["recon", "偵察 視野+1"], ["barrage", "砲擊 削弱敵軍"], ["supply", "補給 工事/士氣"]]
+	var px := 210
+	for p in preps:
+		var kind: String = p[0]
+		var bought: bool = GameState.prep_active(kind)
+		var txt: String = ("✓ " + String(p[1])) if bought else "%s (費%d)" % [String(p[1]), int(GameState.CONQ_PREP_COST[kind])]
+		_econ_button(txt, Vector2(px, 140), Vector2(158, 30), bought or not GameState.can_prepare(kind),
+			_prepare.bind(kind))
+		px += 166
 
 	var vp := get_viewport_rect().size
-	var rect := Rect2(Vector2(90, 150), Vector2(vp.x - 180, vp.y - 230))
+	var rect := Rect2(Vector2(90, 186), Vector2(vp.x - 180, vp.y - 266))
 	var center_of := func(t: Dictionary) -> Vector2:
 		return rect.position + Vector2(float(t.get("x", 0.5)) * rect.size.x, float(t.get("y", 0.5)) * rect.size.y)
 
@@ -150,6 +164,25 @@ func _ready() -> void:
 
 	if GameState.conquest_won():
 		GameState.clear_conquest()
+
+# Small helper for the economy/prep buttons in the header rows.
+func _econ_button(text: String, pos: Vector2, size: Vector2, disabled: bool, cb: Callable) -> void:
+	var b := Button.new()
+	b.text = text
+	b.position = pos
+	b.custom_minimum_size = size
+	b.add_theme_font_size_override("font_size", 13)
+	b.disabled = disabled
+	b.pressed.connect(cb)
+	add_child(b)
+
+func _develop(track: String) -> void:
+	GameState.develop(track)
+	get_tree().reload_current_scene()
+
+func _prepare(kind: String) -> void:
+	GameState.prepare(kind)
+	get_tree().reload_current_scene()
 
 func _attack(tid: String) -> void:
 	if GameState.begin_conquest_attack(tid):
