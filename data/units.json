@@ -9,7 +9,23 @@
     "move": 3,
     "vision": 3,
     "vs_armor": 4,
-    "armor": 0
+    "armor": 0,
+    "skills": [
+      {
+        "id": "brace_ranks",
+        "name": "堅陣",
+        "cooldown": 3,
+        "duration": 1,
+        "ends_turn": true,
+        "self_mods": {
+          "defense": 1
+        },
+        "aura_mods": {
+          "defense": 1
+        },
+        "description_zh": "結陣:消耗行動,自身與相鄰友軍防禦 +1(至下一回合)。"
+      }
+    ]
   },
   "men_at_arms": {
     "name_zh": "重裝步兵",
@@ -71,7 +87,20 @@
     "move": 2,
     "vision": 3,
     "vs_armor": 6,
-    "armor": 0
+    "armor": 0,
+    "skills": [
+      {
+        "id": "volley",
+        "name": "齊射",
+        "cooldown": 3,
+        "duration": 1,
+        "ends_turn": false,
+        "self_mods": {
+          "attack": 2
+        },
+        "description_zh": "排槍齊射:本回合攻擊 +2(免費)。"
+      }
+    ]
   },
   "light_cavalry": {
     "name_zh": "輕騎兵",
@@ -95,7 +124,20 @@
     "move": 5,
     "vision": 4,
     "vs_armor": 2,
-    "armor": 5
+    "armor": 5,
+    "skills": [
+      {
+        "id": "charge",
+        "name": "衝鋒",
+        "cooldown": 3,
+        "duration": 1,
+        "ends_turn": false,
+        "self_mods": {
+          "attack": 2
+        },
+        "description_zh": "蓄勢衝鋒:本回合攻擊 +2(免費,可先發動再攻擊)。"
+      }
+    ]
   },
   "dragoons": {
     "name_zh": "龍騎兵",

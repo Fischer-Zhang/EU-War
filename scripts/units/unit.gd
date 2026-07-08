@@ -53,7 +53,11 @@ var morale: int = CombatEffects.MORALE_BASE
 var morale_max: int = CombatEffects.MORALE_BASE
 var routed: bool = false
 var general_id: String = ""
+# active_effects: [{ self_mods: {attack,defense,...}, turns_left?: int }]. An
+# entry without turns_left is permanent (tech/general/army/deploy bonuses); one
+# with turns_left is a timed skill buff that expires at the owner's turn start.
 var active_effects: Array = []
+var skill_cooldowns: Dictionary = {}   # skill_id -> turns remaining
 
 signal moved(new_coord: Vector2i)
 signal ranked_up(new_rank: int)
@@ -88,7 +92,22 @@ func reset_for_new_turn() -> void:
 	has_attacked = false
 	on_overwatch = false
 	suppression = CombatEffects.recover_suppression(suppression)
+	# Tick skill cooldowns and expire timed buffs.
+	for k in skill_cooldowns.keys():
+		skill_cooldowns[k] = max(0, int(skill_cooldowns[k]) - 1)
+	var kept: Array = []
+	for e in active_effects:
+		if e.has("turns_left"):
+			var tl := int(e["turns_left"]) - 1
+			if tl <= 0:
+				continue
+			e["turns_left"] = tl
+		kept.append(e)
+	active_effects = kept
 	queue_redraw()
+
+func skill_ready(skill_id: String) -> bool:
+	return int(skill_cooldowns.get(skill_id, 0)) <= 0
 
 func move_to(new_coord: Vector2i, world_pos: Vector2, duration: float = 0.0) -> void:
 	coord = new_coord

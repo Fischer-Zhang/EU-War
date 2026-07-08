@@ -87,6 +87,7 @@ var _log_label: RichTextLabel = null
 var _log_lines: Array = []
 var _spawned_reinforcements: Dictionary = {}   # reinforcement index -> true
 var _initial_player_count: int = 0              # for the "no losses" objective
+var _skill_button: Button = null
 
 func _ready() -> void:
 	_fast_mode = not selfplay_difficulty.is_empty()
@@ -149,6 +150,12 @@ func _connect_ui() -> void:
 	result_panel.visible = false
 	_make_hud_clickthrough()
 	_build_combat_log()
+	_skill_button = Button.new()
+	_skill_button.text = "技能"
+	_skill_button.visible = false
+	_skill_button.pressed.connect(_on_skill_pressed)
+	$UI/ActionDock.add_child(_skill_button)
+	$UI/ActionDock.move_child(_skill_button, entrench_button.get_index())
 	_update_action_buttons()
 
 func _build_combat_log() -> void:
@@ -687,6 +694,53 @@ func _update_action_buttons() -> void:
 	entrench_button.visible = can_act
 	brace_button.visible = can_act
 	rally_button.visible = active and (selected_unit.suppression > 0 or selected_unit.routed)
+	if _skill_button != null:
+		var s := _ready_skill(selected_unit) if can_act else {}
+		_skill_button.visible = can_act and not s.is_empty()
+		if _skill_button.visible:
+			_skill_button.text = "技能:%s" % String(s.get("name", ""))
+
+# The unit's first off-cooldown skill (or {} if none / not ready).
+func _ready_skill(unit) -> Dictionary:
+	if unit == null or not is_instance_valid(unit):
+		return {}
+	for s in DataLoader.get_unit_def(unit.type_id).get("skills", []):
+		if unit.skill_ready(String(s.get("id", ""))):
+			return s
+	return {}
+
+func _on_skill_pressed() -> void:
+	if selected_unit == null or selected_unit.is_done_for_turn():
+		return
+	var s := _ready_skill(selected_unit)
+	if not s.is_empty():
+		_activate_skill(selected_unit, s)
+
+func _activate_skill(unit, skill: Dictionary) -> void:
+	var dur := int(skill.get("duration", 1))
+	var self_mods: Dictionary = skill.get("self_mods", {})
+	if not self_mods.is_empty():
+		unit.active_effects.append({"self_mods": self_mods.duplicate(), "turns_left": dur})
+	var aura: Dictionary = skill.get("aura_mods", {})
+	if not aura.is_empty():
+		for nb in HexCoord.neighbors(unit.coord):
+			var ally := hex_map.unit_at(nb)
+			if ally != null and ally.is_alive() and ally.faction_id == unit.faction_id:
+				ally.active_effects.append({"self_mods": aura.duplicate(), "turns_left": dur})
+				ally.queue_redraw()
+	unit.skill_cooldowns[String(skill.get("id", ""))] = int(skill.get("cooldown", 3))
+	_log("[color=#c9a0e0]%s 發動【%s】[/color]" % [unit.display_name, String(skill.get("name", ""))])
+	_flash_status("%s 發動【%s】!" % [unit.display_name, String(skill.get("name", ""))])
+	if bool(skill.get("ends_turn", false)):
+		unit.has_moved = true
+		unit.has_attacked = true
+	unit.queue_redraw()
+	if unit.is_done_for_turn():
+		_deselect()
+	else:
+		_recompute_targets()
+		_update_selected_panel()
+		_update_action_buttons()
 
 func _update_info_label(faction_id: String, turn_number: int) -> void:
 	info_label.text = "第 %d 回合 — %s%s" % [
