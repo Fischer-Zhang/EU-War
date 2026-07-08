@@ -1,16 +1,17 @@
 extends Control
 
-# Conquest strategic layer. Territories on a map coloured by owner, with adjacency
-# links. Player turn: attack a frontline enemy territory (gold) -> its tactical
-# battle; a win captures it. The enemy then counter-attacks one of your frontier
-# territories (orange) -> you must DEFEND it in battle; win secures it, loss loses
-# it. Capturing every enemy territory wins. Built at runtime.
+# Conquest strategic layer with a light economy. Territories on a map coloured by
+# owner + adjacency links. Player turn: attack a frontline enemy (gold) -> its
+# battle (a win captures it); or spend strength to Muster (global +attack) or
+# Fortify an owned frontier region (defenders entrench when held). The enemy then
+# counter-attacks a frontier territory (orange) which you must defend. Capturing
+# every enemy territory wins. Built at runtime; reloads to refresh after a spend.
 
 const COLOR_PLAYER := Color(0.20, 0.45, 0.75)
-const COLOR_SECURED := Color(0.18, 0.55, 0.45)   # held-off-a-counter player land
+const COLOR_SECURED := Color(0.18, 0.55, 0.45)
 const COLOR_ENEMY := Color(0.70, 0.25, 0.20)
-const COLOR_TARGET := Color(0.85, 0.65, 0.20)     # attackable frontline enemy
-const COLOR_UNDER_ATTACK := Color(0.90, 0.40, 0.15)  # your land under enemy assault
+const COLOR_TARGET := Color(0.85, 0.65, 0.20)
+const COLOR_UNDER_ATTACK := Color(0.90, 0.40, 0.15)
 const COLOR_LINK := Color(0.5, 0.5, 0.55, 0.7)
 
 func _ready() -> void:
@@ -30,12 +31,12 @@ func _ready() -> void:
 	var title := Label.new()
 	title.text = String(conq.get("title", "征服"))
 	title.add_theme_font_size_override("font_size", 26)
-	title.position = Vector2(28, 20)
+	title.position = Vector2(28, 18)
 	add_child(title)
 
 	var status := Label.new()
 	status.add_theme_font_size_override("font_size", 16)
-	status.position = Vector2(28, 60)
+	status.position = Vector2(28, 56)
 	if GameState.conquest_won():
 		status.text = "征服完成!全境已納入版圖。"
 		status.modulate = Color(0.5, 0.9, 0.5)
@@ -43,13 +44,29 @@ func _ready() -> void:
 		status.text = "⚠ 敵軍反攻「%s」!點擊該地迎戰防守。" % String(GameState.conquest_territory(under_attack).get("name", under_attack))
 		status.modulate = Color(0.95, 0.6, 0.35)
 	else:
-		status.text = "已佔領 %d / %d 領地 — 點擊金色(前線)敵領地發動進攻。" % [counts.player, counts.total]
+		status.text = "已佔領 %d / %d — 點金色前線進攻,或點己方領地設防。每回合徵收國力。" % [counts.player, counts.total]
 	add_child(status)
+
+	# Economy header.
+	var econ := Label.new()
+	econ.add_theme_font_size_override("font_size", 16)
+	econ.position = Vector2(28, 84)
+	econ.text = "國力 %d  ·  軍備 Lv %d  ·  每回合 +%d" % [
+		GameState.conquest_strength, GameState.conquest_army, GameState.conquest_income()]
+	add_child(econ)
+
+	var muster := Button.new()
+	muster.text = "整軍 (軍備+1,費 %d)" % GameState.CONQ_MUSTER_COST
+	muster.position = Vector2(300, 80)
+	muster.custom_minimum_size = Vector2(220, 30)
+	muster.disabled = (under_attack != "") or not GameState.can_muster()
+	muster.pressed.connect(_muster)
+	add_child(muster)
 
 	var back := Button.new()
 	back.text = "返回主選單"
-	back.position = Vector2(28, 88)
-	back.custom_minimum_size = Vector2(140, 34)
+	back.position = Vector2(540, 80)
+	back.custom_minimum_size = Vector2(140, 30)
 	back.pressed.connect(func():
 		GameState.clear_conquest()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
@@ -65,7 +82,6 @@ func _ready() -> void:
 	for t in terrs:
 		by_id[String(t.get("id", ""))] = t
 
-	# Adjacency links (each undirected pair once, behind the nodes).
 	var drawn := {}
 	for t in terrs:
 		var a: Vector2 = center_of.call(t)
@@ -82,21 +98,24 @@ func _ready() -> void:
 			line.points = PackedVector2Array([a, center_of.call(by_id[tb])])
 			add_child(line)
 
-	# Territory nodes.
 	for t in terrs:
 		var tid := String(t.get("id", ""))
 		var owner := String(GameState.conquest_owner.get(tid, "enemy"))
 		var is_defense := (tid == under_attack)
 		var attackable := (under_attack == "") and GameState.territory_attackable(tid)
+		var can_fort := (under_attack == "") and GameState.can_fortify(tid)
 		var secured := GameState.conquest_secured.has(tid)
+		var fort := GameState.conquest_fortify_level(tid)
 
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(140, 46)
-		btn.size = Vector2(140, 46)
+		btn.custom_minimum_size = Vector2(150, 48)
+		btn.size = Vector2(150, 48)
 		btn.position = center_of.call(t) - btn.size * 0.5
-		btn.add_theme_font_size_override("font_size", 15)
+		btn.add_theme_font_size_override("font_size", 14)
 
 		var label := String(t.get("name", tid))
+		if fort > 0:
+			label += " 🛡%d" % fort
 		var col: Color
 		if is_defense:
 			label += "  ⚔迎戰"
@@ -105,8 +124,8 @@ func _ready() -> void:
 			label += "  ⚔"
 			col = COLOR_TARGET
 		elif owner == "player":
-			if secured:
-				label += "  🛡"
+			if can_fort:
+				label += "  設防 %d" % GameState.CONQ_FORTIFY_COST
 			col = COLOR_SECURED if secured else COLOR_PLAYER
 		else:
 			col = COLOR_ENEMY
@@ -120,14 +139,17 @@ func _ready() -> void:
 			btn.add_theme_stylebox_override(st, sb)
 
 		if is_defense:
-			btn.disabled = false
 			btn.pressed.connect(_defend)
 		elif attackable:
-			btn.disabled = false
 			btn.pressed.connect(_attack.bind(tid))
+		elif can_fort:
+			btn.pressed.connect(_fortify.bind(tid))
 		else:
 			btn.disabled = true
 		add_child(btn)
+
+	if GameState.conquest_won():
+		GameState.clear_conquest()
 
 func _attack(tid: String) -> void:
 	if GameState.begin_conquest_attack(tid):
@@ -136,3 +158,11 @@ func _attack(tid: String) -> void:
 func _defend() -> void:
 	if GameState.begin_conquest_defense():
 		get_tree().change_scene_to_file("res://scenes/briefing.tscn")
+
+func _fortify(tid: String) -> void:
+	GameState.fortify(tid)
+	get_tree().reload_current_scene()   # refresh the map from updated state
+
+func _muster() -> void:
+	GameState.muster()
+	get_tree().reload_current_scene()

@@ -174,6 +174,17 @@ var conquest_owner: Dictionary = {}       # territory_id -> "player" | "enemy"
 var conquest_secured: Dictionary = {}     # territory_id -> true (held off a counter)
 var conquest_battle: Dictionary = {}      # current battle {territory, defense:bool}
 var conquest_enemy_target: String = ""    # queued enemy counter-attack to defend
+# Strategic economy: owned territories earn strength each round, spent on a
+# global army level (+attack in battles) or fortifying frontier regions
+# (defenders entrench when you hold them).
+const CONQ_START_STRENGTH := 3
+const CONQ_MUSTER_COST := 4
+const CONQ_FORTIFY_COST := 2
+const CONQ_ARMY_MAX := 3
+const CONQ_FORTIFY_MAX := 3
+var conquest_strength: int = 0
+var conquest_fortify: Dictionary = {}     # territory_id -> fortify level
+var conquest_army: int = 0
 
 func start_conquest(id: String) -> void:
 	conquest_id = id
@@ -181,6 +192,9 @@ func start_conquest(id: String) -> void:
 	conquest_secured = {}
 	conquest_battle = {}
 	conquest_enemy_target = ""
+	conquest_strength = CONQ_START_STRENGTH
+	conquest_fortify = {}
+	conquest_army = 0
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", "enemy"))
 
@@ -190,6 +204,9 @@ func clear_conquest() -> void:
 	conquest_secured = {}
 	conquest_battle = {}
 	conquest_enemy_target = ""
+	conquest_strength = 0
+	conquest_fortify = {}
+	conquest_army = 0
 
 func in_conquest() -> bool:
 	return conquest_id != ""
@@ -272,7 +289,8 @@ func resolve_conquest_battle(player_won: bool) -> void:
 	else:
 		if player_won:
 			conquest_owner[tid] = "player"
-		# The enemy immediately queues its counter-attack (if it has one).
+		# A round passed: collect strength, then the enemy queues its counter.
+		conquest_strength += conquest_income()
 		conquest_enemy_target = _enemy_pick_target()
 
 func conquest_won() -> bool:
@@ -291,3 +309,38 @@ func conquest_counts() -> Dictionary:
 		if String(conquest_owner[tid]) == "player":
 			player += 1
 	return {"player": player, "total": total}
+
+# Strength earned per round: one per owned territory.
+func conquest_income() -> int:
+	var n := 0
+	for tid in conquest_owner:
+		if String(conquest_owner[tid]) == "player":
+			n += 1
+	return n
+
+func can_muster() -> bool:
+	return in_conquest() and conquest_army < CONQ_ARMY_MAX and conquest_strength >= CONQ_MUSTER_COST
+
+func muster() -> bool:
+	if not can_muster():
+		return false
+	conquest_strength -= CONQ_MUSTER_COST
+	conquest_army += 1
+	return true
+
+func can_fortify(tid: String) -> bool:
+	if not in_conquest() or String(conquest_owner.get(tid, "")) != "player":
+		return false
+	if String(conquest_territory(tid).get("scenario", "")) == "":
+		return false  # the home base has no battle to fortify
+	return int(conquest_fortify.get(tid, 0)) < CONQ_FORTIFY_MAX and conquest_strength >= CONQ_FORTIFY_COST
+
+func fortify(tid: String) -> bool:
+	if not can_fortify(tid):
+		return false
+	conquest_strength -= CONQ_FORTIFY_COST
+	conquest_fortify[tid] = int(conquest_fortify.get(tid, 0)) + 1
+	return true
+
+func conquest_fortify_level(tid: String) -> int:
+	return int(conquest_fortify.get(tid, 0))

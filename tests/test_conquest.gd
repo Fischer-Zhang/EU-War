@@ -91,6 +91,48 @@ func _run() -> void:
 			gs.resolve_conquest_battle(true)
 	ok(gs.conquest_won(), "a perfect player conquers everything (in %d steps)" % steps)
 
+	# --- Economy: income, muster, fortify, and battle bonuses ---
+	gs.start_conquest(qid)
+	ok(gs.conquest_strength == gs.CONQ_START_STRENGTH, "starts with seed strength")
+	ok(gs.conquest_army == 0, "army level starts at 0")
+	ok(not gs.can_fortify("home"), "home (no battle) can't be fortified")
+
+	gs.conquest_strength = 20
+	gs.begin_conquest_attack("normandy")
+	gs.resolve_conquest_battle(true)   # capture normandy; a round passes -> income
+	ok(gs.conquest_strength > 20, "strength grows from income after a round (%d)" % gs.conquest_strength)
+	ok(gs.can_fortify("normandy"), "a captured frontier region can be fortified")
+	var before = gs.conquest_strength
+	ok(gs.fortify("normandy"), "fortify succeeds")
+	ok(gs.conquest_fortify_level("normandy") == 1 and gs.conquest_strength == before - gs.CONQ_FORTIFY_COST, "fortify raises level and spends strength")
+	ok(gs.muster(), "muster succeeds")
+	ok(gs.conquest_army == 1, "muster raises army level")
+
+	# Battle bonuses: defending a fortified region entrenches units and the army
+	# level adds attack — verify on real units in a conquest defense battle.
+	gs.conquest_army = 2
+	gs.conquest_fortify["normandy"] = 2
+	gs.conquest_enemy_target = "normandy"
+	gs.begin_conquest_defense()
+	var b = load("res://scenes/battle.tscn").instantiate()
+	root.add_child(b)
+	for _i in range(10):
+		await process_frame
+	var sample = null
+	for u in b.units:
+		if u.faction_id == b.player_faction:
+			sample = u
+			break
+	ok(sample != null and sample.dig_in_level >= 2, "fortify entrenches defenders (dig-in %d)" % (sample.dig_in_level if sample else -1))
+	var has_army_buff := false
+	if sample != null:
+		for e in sample.active_effects:
+			if int(e.get("self_mods", {}).get("attack", 0)) >= 2:
+				has_army_buff = true
+	ok(has_army_buff, "army level adds attack to player units")
+	b.queue_free()
+	await process_frame
+
 	# Map builds.
 	gs.start_conquest(qid)
 	var map = load("res://scenes/conquest_map.tscn").instantiate()

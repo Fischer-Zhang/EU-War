@@ -125,6 +125,7 @@ func _setup_scenario() -> void:
 	if player_faction == "":
 		player_faction = factions.keys()[0]
 	_apply_tech_bonuses()
+	_apply_conquest_bonuses()
 	# Objective marker from a capture victory condition.
 	var vic: Dictionary = scenario.get("victory", {}).get(player_faction, {})
 	if String(vic.get("type", "")) == "capture":
@@ -877,6 +878,24 @@ func _apply_tech_bonuses() -> void:
 				break
 		if any:
 			u.active_effects.append({"self_mods": mods})
+
+# Conquest economy bonuses: a global army level adds attack to all player units;
+# fortifying a territory entrenches your units when you defend it.
+func _apply_conquest_bonuses() -> void:
+	if not GameState.in_conquest():
+		return
+	var army: int = GameState.conquest_army
+	var defense: bool = bool(GameState.conquest_battle.get("defense", false))
+	var fort := 0
+	if defense:
+		fort = GameState.conquest_fortify_level(String(GameState.conquest_battle.get("territory", "")))
+	for u in units:
+		if u.faction_id != player_faction:
+			continue
+		if army > 0:
+			u.active_effects.append({"self_mods": {"attack": army}})
+		if fort > 0:
+			u.dig_in_level = max(u.dig_in_level, min(fort, Unit.MAX_DIG_IN))
 
 func _has_deployment() -> bool:
 	var dep: Dictionary = scenario.get("deployment", {})
