@@ -20,6 +20,7 @@ const TurnManager := preload("res://scripts/turn/turn_manager.gd")
 const DamagePreview := preload("res://scripts/ui/damage_preview.gd")
 const DamagePopup := preload("res://scripts/ui/damage_popup.gd")
 const VictoryChecker := preload("res://scripts/scenario/victory_checker.gd")
+const ReinforcementSpawner := preload("res://scripts/scenario/reinforcement_spawner.gd")
 const AIController := preload("res://scripts/turn/ai_controller.gd")
 
 const DEFAULT_SCENARIO := "00_tutorial"
@@ -83,6 +84,7 @@ var _fast_mode: bool = false
 # Combat log (runtime-built, top-left): last few resolved events.
 var _log_label: RichTextLabel = null
 var _log_lines: Array = []
+var _spawned_reinforcements: Dictionary = {}   # reinforcement index -> true
 
 func _ready() -> void:
 	_fast_mode = not selfplay_difficulty.is_empty()
@@ -205,6 +207,7 @@ func _on_turn_started(faction_id: String, turn_number: int) -> void:
 		if u.faction_id == faction_id and u.is_alive():
 			u.reset_for_new_turn()
 			_recover_morale(u)
+	_spawn_reinforcements(faction_id, turn_number)
 	_refresh_visibility()
 	_update_info_label(faction_id, turn_number)
 	_show_turn_banner("%s 的回合 · 第 %d 回合" % [_faction_name(faction_id), turn_number])
@@ -217,6 +220,15 @@ func _on_turn_started(faction_id: String, turn_number: int) -> void:
 	else:
 		_set_player_controls(true)
 		_flash_status("你的回合:選取部隊行動。")
+
+func _spawn_reinforcements(faction_id: String, turn_number: int) -> void:
+	var fresh := ReinforcementSpawner.spawn_for_turn(
+		scenario, factions, hex_map, units, _spawned_reinforcements, faction_id, turn_number)
+	for u in fresh:
+		u.ranked_up.connect(func(_r): _flash_status("%s 晉升!" % u.display_name))
+		_log("[color=#7fd08f]增援抵達:%s[/color]" % u.display_name)
+	if not fresh.is_empty():
+		_flash_status("%s 的增援抵達戰場!" % _faction_name(faction_id))
 
 func _advance_turn() -> void:
 	if battle_over:

@@ -145,6 +145,20 @@ def main():
                 errors.append(f"{sid}: duplicate coord {u.get('at')} ({u.get('name')} & {seen[key]})")
             seen[key] = u.get("name")
 
+        # Reinforcements (optional): scheduled spawns, same shape as units.
+        for r in s.get("reinforcements", []):
+            if r.get("type") not in units:
+                errors.append(f"{sid}: reinforcement unknown unit '{r.get('type')}'")
+            if r.get("faction") not in faction_ids:
+                errors.append(f"{sid}: reinforcement in unknown faction '{r.get('faction')}'")
+            if not isinstance(r.get("at_turn"), int) or r.get("at_turn", 0) < 1:
+                errors.append(f"{sid}: reinforcement '{r.get('name')}' needs at_turn >= 1")
+            col, row = r.get("at", [0, 0])
+            if not (0 <= row < (h or 0) and 0 <= col < (w or 0)):
+                errors.append(f"{sid}: reinforcement '{r.get('name')}' off-map at {r.get('at')}")
+            elif rows[row][col] in impassable:
+                errors.append(f"{sid}: reinforcement '{r.get('name')}' on impassable {rows[row][col]}")
+
         # Deployment zones (optional): faction must exist, rect in bounds.
         for fid, cfg in s.get("deployment", {}).items():
             if fid not in faction_ids:

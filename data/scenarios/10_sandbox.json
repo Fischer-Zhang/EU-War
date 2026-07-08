@@ -509,5 +509,17 @@
       "type": "eliminate",
       "by_turn": 99
     }
-  }
+  },
+  "reinforcements": [
+    {
+      "faction": "blue",
+      "type": "longbowmen",
+      "name": "增援長弓",
+      "at": [
+        0,
+        0
+      ],
+      "at_turn": 3
+    }
+  ]
 }
