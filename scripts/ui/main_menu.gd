@@ -7,6 +7,7 @@ func _ready() -> void:
 	single_battle_button.pressed.connect(_on_single_battle_pressed)
 	quit_button.pressed.connect(_on_quit_pressed)
 	_add_campaign_button()
+	_add_conquest_button()
 	single_battle_button.grab_focus()
 
 # Built at runtime and inserted just after the single-battle button so the menu
@@ -24,14 +25,35 @@ func _add_campaign_button() -> void:
 	vbox.add_child(btn)
 	vbox.move_child(btn, single_battle_button.get_index() + 1)
 
+func _add_conquest_button() -> void:
+	if DataLoader.conquests.is_empty():
+		return
+	var vbox := single_battle_button.get_parent()
+	var btn := Button.new()
+	btn.text = "征服"
+	btn.custom_minimum_size = single_battle_button.custom_minimum_size
+	btn.add_theme_font_size_override("font_size",
+		single_battle_button.get_theme_font_size("font_size"))
+	btn.pressed.connect(_on_conquest_pressed)
+	vbox.add_child(btn)
+	vbox.move_child(btn, quit_button.get_index())
+
 func _on_single_battle_pressed() -> void:
 	GameState.clear_campaign()
+	GameState.clear_conquest()
 	GameState.browsing_campaigns = false
 	get_tree().change_scene_to_file("res://scenes/scenario_select.tscn")
 
 func _on_campaign_pressed() -> void:
+	GameState.clear_conquest()
 	GameState.browsing_campaigns = true
 	get_tree().change_scene_to_file("res://scenes/scenario_select.tscn")
+
+func _on_conquest_pressed() -> void:
+	GameState.clear_campaign()
+	# One conquest for now — start it directly and open the strategic map.
+	GameState.start_conquest(String(DataLoader.conquests.keys()[0]))
+	get_tree().change_scene_to_file("res://scenes/conquest_map.tscn")
 
 func _on_quit_pressed() -> void:
 	get_tree().quit()

@@ -941,6 +941,9 @@ func _end_battle(w: String) -> void:
 		GameState.capture_roster(_living_units_of(player_faction))
 		GameState.award_research(GameState.RESEARCH_PER_WIN)
 		GameState.advance_campaign()
+	# Conquest: a win captures the attacked territory.
+	if GameState.in_conquest() and player_won:
+		GameState.capture_conquest_target()
 	result_label.text = "勝利!" if player_won else "戰敗"
 	result_label.modulate = Color(0.4, 0.9, 0.4) if player_won else Color(0.9, 0.4, 0.4)
 	var lines := []
@@ -956,12 +959,20 @@ func _end_battle(w: String) -> void:
 			lines.append("倖存部隊已編入下一場,保留老兵經驗。")
 		else:
 			lines.append("再接再厲——可重試本場。")
+	elif GameState.in_conquest():
+		lines.append("")
+		if player_won:
+			lines.append("[color=#e0c060]已佔領該領地![/color]" if not GameState.conquest_won() else "[color=#e0c060]征服完成——全境臣服![/color]")
+		else:
+			lines.append("進攻受挫——可重整後再攻。")
 	result_summary.text = "\n".join(lines)
 	menu_button.text = _result_button_text(player_won)
 	result_panel.visible = true
 	GameState.end_scenario(w, {"winner": w})
 
 func _result_button_text(player_won: bool) -> String:
+	if GameState.in_conquest():
+		return "返回戰略地圖"
 	if not GameState.in_campaign():
 		return "返回列表"
 	if player_won and GameState.campaign_complete():
@@ -971,6 +982,9 @@ func _result_button_text(player_won: bool) -> String:
 	return "重試本場"
 
 func _on_result_button() -> void:
+	if GameState.in_conquest():
+		get_tree().change_scene_to_file("res://scenes/conquest_map.tscn")
+		return
 	if GameState.in_campaign():
 		if winner == player_faction and GameState.campaign_complete():
 			GameState.clear_campaign()

@@ -1,0 +1,15 @@
+{
+  "continental": {
+    "title": "征服:歐陸攻略",
+    "description": "從本土出發,沿前線併吞敵方領地。只能攻擊與己方領地相鄰的敵territory;每塊領地由一場歷史會戰決定歸屬,打贏即佔領。南北兩路並進,最終會師拿下敵方核心「低地」。佔領全部敵方領地即獲勝;戰敗不丟地,可重整再戰。",
+    "victory": "eliminate",
+    "territories": [
+      { "id": "home",       "name": "本土",   "owner": "player", "x": 0.10, "y": 0.50, "scenario": "", "links": ["normandy", "lombardy"] },
+      { "id": "normandy",   "name": "諾曼第", "owner": "enemy",  "x": 0.34, "y": 0.24, "scenario": "02_crecy_1346",       "links": ["home", "picardy"] },
+      { "id": "picardy",    "name": "皮卡第", "owner": "enemy",  "x": 0.60, "y": 0.20, "scenario": "03_agincourt_1415",   "links": ["normandy", "lowlands"] },
+      { "id": "lombardy",   "name": "倫巴底", "owner": "enemy",  "x": 0.34, "y": 0.76, "scenario": "04_marignano_1515",   "links": ["home", "rhineland"] },
+      { "id": "rhineland",  "name": "萊茵",   "owner": "enemy",  "x": 0.60, "y": 0.80, "scenario": "06_breitenfeld_1631", "links": ["lombardy", "lowlands"] },
+      { "id": "lowlands",   "name": "低地",   "owner": "enemy",  "x": 0.86, "y": 0.50, "scenario": "08_blenheim_1704",     "links": ["picardy", "rhineland"] }
+    ]
+  }
+}

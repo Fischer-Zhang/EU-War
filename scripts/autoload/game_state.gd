@@ -166,3 +166,77 @@ func tech_mods_for(type_id: String) -> Dictionary:
 		for k in out.keys():
 			out[k] += int(m.get(k, 0))
 	return out
+
+# ------------------------------------------------------------------ conquest
+
+var conquest_id: String = ""
+var conquest_owner: Dictionary = {}   # territory_id -> "player" | "enemy"
+var conquest_target: String = ""      # territory currently being attacked
+
+func start_conquest(id: String) -> void:
+	conquest_id = id
+	conquest_owner = {}
+	conquest_target = ""
+	for t in conquest_territories():
+		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", "enemy"))
+
+func clear_conquest() -> void:
+	conquest_id = ""
+	conquest_owner = {}
+	conquest_target = ""
+
+func in_conquest() -> bool:
+	return conquest_id != ""
+
+func conquest_territories() -> Array:
+	return DataLoader.get_conquest(conquest_id).get("territories", [])
+
+func conquest_territory(tid: String) -> Dictionary:
+	for t in conquest_territories():
+		if String(t.get("id", "")) == tid:
+			return t
+	return {}
+
+# Enemy-owned AND on the frontline (adjacent to a player-owned territory).
+func territory_attackable(tid: String) -> bool:
+	if String(conquest_owner.get(tid, "")) != "enemy":
+		return false
+	var t := conquest_territory(tid)
+	for nb in t.get("links", []):
+		if String(conquest_owner.get(String(nb), "")) == "player":
+			return true
+	# Robustness against asymmetric links: also check reverse adjacency.
+	for other in conquest_territories():
+		if String(conquest_owner.get(String(other.get("id", "")), "")) == "player" \
+				and tid in other.get("links", []):
+			return true
+	return false
+
+func begin_conquest_attack(tid: String) -> bool:
+	if not territory_attackable(tid):
+		return false
+	conquest_target = tid
+	current_scenario_id = String(conquest_territory(tid).get("scenario", ""))
+	return true
+
+func capture_conquest_target() -> void:
+	if conquest_target != "":
+		conquest_owner[conquest_target] = "player"
+		conquest_target = ""
+
+func conquest_won() -> bool:
+	if not in_conquest():
+		return false
+	for tid in conquest_owner:
+		if String(conquest_owner[tid]) == "enemy":
+			return false
+	return true
+
+func conquest_counts() -> Dictionary:
+	var player := 0
+	var total := 0
+	for tid in conquest_owner:
+		total += 1
+		if String(conquest_owner[tid]) == "player":
+			player += 1
+	return {"player": player, "total": total}

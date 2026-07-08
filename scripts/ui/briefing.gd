@@ -71,6 +71,10 @@ func _on_start_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/battle.tscn")
 
 func _on_back_pressed() -> void:
+	if GameState.in_conquest():
+		GameState.conquest_target = ""   # cancel this attack, keep the campaign
+		get_tree().change_scene_to_file("res://scenes/conquest_map.tscn")
+		return
 	if GameState.in_campaign():
 		GameState.clear_campaign()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

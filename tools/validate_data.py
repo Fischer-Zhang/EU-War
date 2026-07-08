@@ -83,6 +83,26 @@ def main():
             if sid not in scenario_ids:
                 errors.append(f"campaign {cid}: unknown scenario '{sid}'")
 
+    # Conquest (optional): territories, adjacency, and per-territory scenarios.
+    conquest_path = os.path.join(DATA, "conquest.json")
+    conquests = load(conquest_path) if os.path.exists(conquest_path) else {}
+    for qid, q in conquests.items():
+        terrs = q.get("territories", [])
+        ids = {t.get("id") for t in terrs}
+        if not any(t.get("owner") == "player" for t in terrs):
+            errors.append(f"conquest {qid}: no player-owned starting territory")
+        if not any(t.get("owner") == "enemy" for t in terrs):
+            errors.append(f"conquest {qid}: no enemy territory to conquer")
+        for t in terrs:
+            sid = t.get("scenario", "")
+            if sid and sid not in scenario_ids:
+                errors.append(f"conquest {qid}: territory '{t.get('id')}' unknown scenario '{sid}'")
+            if t.get("owner") == "enemy" and not sid:
+                errors.append(f"conquest {qid}: enemy territory '{t.get('id')}' needs a scenario")
+            for nb in t.get("links", []):
+                if nb not in ids:
+                    errors.append(f"conquest {qid}: territory '{t.get('id')}' links unknown '{nb}'")
+
     for fn in scenario_files:
         s = load(os.path.join(scen_dir, fn))
         sid = s.get("id", fn)
