@@ -200,6 +200,7 @@ func relocate_unit(unit: Unit, dest: Vector2i) -> void:
 	unit.queue_redraw()
 
 const STEP_DURATION := 0.12  # seconds per hex of the move animation
+var animate_moves: bool = true  # set false for headless self-play (snap instantly)
 
 # Animates `unit` along `path` and returns the total animation duration so the
 # caller can await the FULL move before starting the next action. Awaiting a
@@ -213,6 +214,12 @@ func move_unit_along_path(unit: Unit, path: Array) -> float:
 	occupants[dest] = unit
 	unit.coord = dest
 	unit.has_moved = true
+	if not animate_moves:
+		# No frames run during synchronous self-play, so snap rather than tween.
+		unit.position = HexCoord.to_pixel(dest, HEX_SIZE)
+		unit.moved.emit(dest)
+		unit.queue_redraw()
+		return 0.0
 	var tween := unit.create_tween()
 	tween.set_trans(Tween.TRANS_LINEAR)
 	for i in range(1, path.size()):

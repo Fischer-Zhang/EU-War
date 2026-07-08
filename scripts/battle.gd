@@ -69,7 +69,18 @@ var _deploy_zone: Dictionary = {}   # axial coord -> true (valid placement hexes
 var _deploy_pick: Unit = null       # unit currently picked up for placement
 var _deploy_bar: Panel = null
 
+# Self-play (headless AI-vs-AI, for difficulty/balance validation). When
+# selfplay_difficulty is set (faction_id -> difficulty) every faction is AI,
+# each side using its assigned difficulty; deployment/tutorial are skipped,
+# cosmetic animation waits are skipped (_fast_mode), and max_turns caps a
+# stalemate as a draw (winner == "").
+var selfplay_difficulty: Dictionary = {}
+var max_turns: int = 0
+var _fast_mode: bool = false
+
 func _ready() -> void:
+	_fast_mode = not selfplay_difficulty.is_empty()
+	hex_map.animate_moves = not _fast_mode
 	var sid := GameState.current_scenario_id
 	if sid == "":
 		sid = DEFAULT_SCENARIO
@@ -85,10 +96,11 @@ func _ready() -> void:
 	# Center the camera on the map.
 	if camera and camera.has_method("fit_world_rect"):
 		camera.fit_world_rect(hex_map.get_map_rect(), Rect2(), 1.0)
-	if _has_deployment():
+	if _has_deployment() and not _fast_mode:
 		_enter_deploy_mode()
 	else:
-		_setup_tutorial()
+		if not _fast_mode:
+			_setup_tutorial()
 		turn_manager.emit_initial()
 
 func _setup_scenario() -> void:
@@ -168,6 +180,9 @@ func _advance_turn() -> void:
 	if w != "":
 		_end_battle(w)
 		return
+	if max_turns > 0 and turn_manager.turn_number >= max_turns:
+		_end_battle("")  # stalemate → draw
+		return
 	turn_manager.end_turn()
 
 func _on_end_turn_pressed() -> void:
@@ -178,7 +193,7 @@ func _on_end_turn_pressed() -> void:
 # ------------------------------------------------------------------ AI turn
 
 func _run_ai_turn(faction_id: String) -> void:
-	var ai := AIController.new(GameState.difficulty)
+	var ai := AIController.new(_ai_difficulty_for(faction_id))
 	var ai_units := _living_units_of(faction_id)
 	ai_units.sort_custom(func(a, b): return a.coord.y * 10000 + a.coord.x < b.coord.y * 10000 + b.coord.x)
 	for u in ai_units:
@@ -191,7 +206,7 @@ func _run_ai_turn(faction_id: String) -> void:
 			continue
 		if order.path.size() >= 2:
 			var move_dur := hex_map.move_unit_along_path(u, order.path)
-			await get_tree().create_timer(move_dur + 0.06).timeout
+			await _pause(move_dur + 0.06)
 			await _resolve_brace_reactions(u)
 			if not u.is_alive():
 				continue
@@ -206,7 +221,7 @@ func _run_ai_turn(faction_id: String) -> void:
 			u.entrench()
 		else:
 			u.has_attacked = true
-		await get_tree().create_timer(0.14).timeout
+		await _pause(0.14)
 	_refresh_visibility()
 
 func _auto_withdraw_routed(faction_id: String) -> void:
@@ -217,7 +232,7 @@ func _auto_withdraw_routed(faction_id: String) -> void:
 		var away := _step_away_from_enemies(u)
 		if away != u.coord and not occ.has(away) and not hex_map.terrain_impassable(hex_map.terrain_at(away)):
 			var move_dur := hex_map.move_unit_along_path(u, [u.coord, away])
-			await get_tree().create_timer(move_dur).timeout
+			await _pause(move_dur)
 		u.has_attacked = true
 
 func _step_away_from_enemies(u: Unit) -> Vector2i:
@@ -269,7 +284,7 @@ func _perform_attack(attacker: Unit, target: Unit) -> void:
 
 	_refresh_visibility()
 	_update_selected_panel()
-	await get_tree().create_timer(0.12).timeout
+	await _pause(0.12)
 	var w := VictoryChecker.evaluate(scenario, factions, units, turn_manager.turn_number)
 	if w != "":
 		_end_battle(w)
@@ -344,7 +359,7 @@ func _resolve_brace_reactions(mover: Unit) -> void:
 		_flash_status("%s 對 %s 進行預備射擊!" % [u.display_name, mover.display_name])
 		_apply_hit(u, mover, react, true)
 		u.gain_xp(1)
-		await get_tree().create_timer(0.12).timeout
+		await _pause(0.12)
 
 func _kill_unit(u: Unit) -> void:
 	hex_map.place_wreckage(u.coord, u.faction_color)
@@ -439,7 +454,7 @@ func _move_selected(coord: Vector2i) -> void:
 		return
 	var mover := selected_unit
 	var move_dur := hex_map.move_unit_along_path(mover, path)
-	await get_tree().create_timer(move_dur + 0.06).timeout
+	await _pause(move_dur + 0.06)
 	await _resolve_brace_reactions(mover)
 	_notify_tutorial("move")
 	_refresh_visibility()
@@ -569,7 +584,18 @@ func _terrain_def(coord: Vector2i) -> Dictionary:
 	return DataLoader.get_terrain_def(tid)
 
 func _is_ai(faction_id: String) -> bool:
+	if not selfplay_difficulty.is_empty():
+		return true  # self-play: every faction is AI-driven
 	return String(factions.get(faction_id, {}).get("controller", "ai")) != "player"
+
+func _ai_difficulty_for(faction_id: String) -> String:
+	return String(selfplay_difficulty.get(faction_id, GameState.difficulty))
+
+# Cosmetic pause between AI actions — a no-op in fast/self-play mode.
+func _pause(seconds: float) -> void:
+	if _fast_mode:
+		return
+	await get_tree().create_timer(seconds).timeout
 
 func _faction_name(faction_id: String) -> String:
 	return String(factions.get(faction_id, {}).get("name", faction_id))
