@@ -17,6 +17,7 @@ const CombatResolver := preload("res://scripts/combat/combat_resolver.gd")
 const CombatEffects := preload("res://scripts/combat/combat_effects.gd")
 const CombatModifiers := preload("res://scripts/combat/combat_modifiers.gd")
 const TurnManager := preload("res://scripts/turn/turn_manager.gd")
+const DamagePreview := preload("res://scripts/ui/damage_preview.gd")
 const VictoryChecker := preload("res://scripts/scenario/victory_checker.gd")
 const AIController := preload("res://scripts/turn/ai_controller.gd")
 
@@ -665,6 +666,17 @@ func _on_hex_hovered(coord: Vector2i, terrain_id: String) -> void:
 	if terrain_id == "":
 		return
 	var u := hex_map.unit_at(coord)
+	# Attack preview: hovering an attackable enemy with one of our units selected
+	# shows the predicted outcome before committing.
+	if not _deploy_mode and selected_unit != null and u != null and u in attack_targets:
+		var p := DamagePreview.preview(
+			selected_unit, u,
+			DataLoader.get_unit_def(selected_unit.type_id), DataLoader.get_unit_def(u.type_id),
+			DataLoader.get_general_def(selected_unit.general_id), DataLoader.get_general_def(u.general_id),
+			_terrain_def(selected_unit.coord), _terrain_def(u.coord),
+			_visible_for(player_faction), hex_map)
+		status_label.text = DamagePreview.summary(p, selected_unit, u)
+		return
 	if u != null and u.visible:
 		status_label.text = "%s — HP %d/%d  %s" % [u.display_name, u.hp, u.max_hp, _faction_name(u.faction_id)]
 	else:
