@@ -9,6 +9,7 @@ extends SceneTree
 
 const CombatRules = preload("res://scripts/combat/combat_rules.gd")
 const Pathfinding = preload("res://scripts/grid/pathfinding.gd")
+const CombatResolver = preload("res://scripts/combat/combat_resolver.gd")
 
 var fails := 0
 
@@ -70,6 +71,17 @@ func _run() -> void:
 
 	# ZoC softened to +1 move point.
 	ok(Pathfinding.ZOC_PENALTY == 1, "ZoC penalty softened to +1 move")
+
+	# Realism: heavy cavalry must be vulnerable to massed fire / anti-armor, not
+	# near-invulnerable. Verify with the real unit data through the resolver.
+	var plain := {"defense": 0}
+	var cav = dl.get_unit_def("heavy_cavalry")
+	var lb_dmg = CombatResolver.resolve(longbow, cav, longbow.hp, cav.hp, plain, plain, 2).damage_to_defender
+	ok(3 * lb_dmg >= cav.hp - 2, "three longbows nearly kill a heavy cavalry (3x%d vs %d hp)" % [lb_dmg, cav.hp])
+	for t in ["pikemen", "musketeers", "men_at_arms"]:
+		var d = dl.get_unit_def(t)
+		var dmg = CombatResolver.resolve(d, cav, d.hp, cav.hp, plain, plain, int(d.range)).damage_to_defender
+		ok(dmg >= 4, "%s hurts heavy cavalry (%d dmg, not floored)" % [t, dmg])
 
 	if fails == 0:
 		print("test_ranged_los: ok")

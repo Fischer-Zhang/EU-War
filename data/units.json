@@ -9,7 +9,7 @@
     "move": 3,
     "vision": 3,
     "vs_armor": 4,
-    "armor": 1
+    "armor": 0
   },
   "men_at_arms": {
     "name_zh": "重裝步兵",
@@ -32,7 +32,7 @@
     "range": 2,
     "move": 3,
     "vision": 4,
-    "vs_armor": 2,
+    "vs_armor": 3,
     "armor": 0,
     "arcing": true
   },
@@ -41,7 +41,7 @@
     "cost": 2,
     "hp": 9,
     "attack": 5,
-    "defense": 2,
+    "defense": 3,
     "range": 2,
     "move": 2,
     "vision": 3,
@@ -78,19 +78,19 @@
     "cost": 2,
     "hp": 10,
     "attack": 5,
-    "defense": 3,
+    "defense": 2,
     "range": 1,
     "move": 6,
     "vision": 5,
     "vs_armor": 1,
-    "armor": 1
+    "armor": 0
   },
   "heavy_cavalry": {
     "name_zh": "重騎兵",
     "cost": 4,
     "hp": 16,
     "attack": 8,
-    "defense": 5,
+    "defense": 3,
     "range": 1,
     "move": 5,
     "vision": 4,
@@ -107,7 +107,7 @@
     "move": 5,
     "vision": 4,
     "vs_armor": 3,
-    "armor": 1
+    "armor": 0
   },
   "field_cannon": {
     "name_zh": "野戰砲",
@@ -115,12 +115,12 @@
     "hp": 8,
     "attack": 8,
     "defense": 1,
-    "range": 4,
+    "range": 3,
     "move": 1,
     "vision": 2,
     "vs_armor": 3,
     "armor": 0,
-    "indirect": true
+    "no_counter": true
   },
   "mortar": {
     "name_zh": "臼砲",

@@ -51,9 +51,11 @@ static func resolve(
 	)
 
 	# Counter-attack: defender must survive, attacker must be in the defender's
-	# reach, and the defender must not be an indirect (cannon/mortar) piece.
+	# reach, and the defender must be able to retaliate — indirect pieces (mortar)
+	# and no_counter crews (field guns) never counter a charge.
 	var def_range := int(def_def.get("range", 1))
-	if not suppress_counter and not out.defender_dies and distance <= def_range and not def_def.get("indirect", false):
+	var cannot_counter: bool = def_def.get("indirect", false) or def_def.get("no_counter", false)
+	if not suppress_counter and not out.defender_dies and distance <= def_range and not cannot_counter:
 		out.counter_damage = max(
 			1,
 			_compute_damage(
