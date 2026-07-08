@@ -35,10 +35,14 @@ static func can_attack_from_coord(
 		return false
 	if not visible_hexes.has(target.coord):
 		return false
-	# Direct fire needs a clear lane: terrain AND any intervening unit block it.
-	if not atk_def.get("indirect", false) \
-			and not Visibility.has_los(attacker_coord, target.coord, hex_map, attacker_faction, true):
-		return false
+	# Line-of-fire. Indirect pieces (cannon/mortar) ignore it. Arcing missile
+	# troops (bows/crossbows) lob over FRIENDLY units — only enemy units and
+	# blocking terrain interrupt them. Flat-shooting guns need a fully clear lane
+	# (any intervening unit blocks).
+	if not atk_def.get("indirect", false):
+		var block_all_units: bool = not bool(atk_def.get("arcing", false))
+		if not Visibility.has_los(attacker_coord, target.coord, hex_map, attacker_faction, block_all_units):
+			return false
 	return true
 
 static func targets_for_attacker(

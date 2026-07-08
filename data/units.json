@@ -33,7 +33,8 @@
     "move": 3,
     "vision": 4,
     "vs_armor": 2,
-    "armor": 0
+    "armor": 0,
+    "arcing": true
   },
   "crossbowmen": {
     "name_zh": "弩兵",
@@ -45,7 +46,8 @@
     "move": 2,
     "vision": 3,
     "vs_armor": 4,
-    "armor": 0
+    "armor": 0,
+    "arcing": true
   },
   "arquebusiers": {
     "name_zh": "火繩槍兵",

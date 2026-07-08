@@ -4,7 +4,7 @@ extends RefCounted
 const HexCoord := preload("res://scripts/grid/hex_coord.gd")
 const CombatEffects := preload("res://scripts/combat/combat_effects.gd")
 
-const ZOC_PENALTY := 2  # extra cost to enter a hex adjacent to an enemy
+const ZOC_PENALTY := 1  # extra move cost to enter a hex adjacent to an enemy
 const SUBHEX := 2       # internal cost scale: normal hex = SUBHEX, road = 1 (half)
 const IMPASSABLE := 1 << 20  # river / mountain (unless bridged): never enterable
 
