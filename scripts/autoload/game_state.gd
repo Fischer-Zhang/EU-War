@@ -14,15 +14,23 @@ var campaign_index: int = 0
 var campaign_roster: Array = []   # Array[Dictionary]: {type,name,xp,rank,general}
 var browsing_campaigns: bool = false   # select screen mode: campaigns vs scenarios
 
-# Tech tree (campaign-only): research points earned from victories are spent to
-# unlock army-wide upgrades that add stat modifiers to matching player units.
+# Tech tree (GLOBAL & persistent): research points earned from victories in ANY
+# mode (single battle / campaign / conquest) accrue to one shared pool, and
+# unlocked upgrades add stat modifiers to matching player units in every mode.
+# Both persist to disk (SAVE_PATH) so progression survives app restarts — the
+# tree is reachable from the main menu, not tied to a campaign. See
+# reference project WorldWarII, which persists progression under user://.
 const RESEARCH_START := 3
 const RESEARCH_PER_WIN := 3
+const PROGRESS_SAVE_PATH := "user://progress.json"
 var research_points: int = 0
 var unlocked_techs: Array = []
 
 signal scenario_started(scenario_id: String)
 signal scenario_ended(winner: String, summary: Dictionary)
+
+func _ready() -> void:
+	_load_progress()
 
 func start_scenario(id: String) -> void:
 	current_scenario_id = id
@@ -68,19 +76,17 @@ func end_scenario(winner: String, summary: Dictionary) -> void:
 # ------------------------------------------------------------------ campaign
 
 func start_campaign(id: String) -> void:
+	# Research points / unlocked techs are GLOBAL now — a campaign no longer
+	# resets them (see the tech-tree section).
 	campaign_id = id
 	campaign_index = 0
 	campaign_roster = []
-	research_points = RESEARCH_START
-	unlocked_techs = []
 	current_scenario_id = current_campaign_scenario()
 
 func clear_campaign() -> void:
 	campaign_id = ""
 	campaign_index = 0
 	campaign_roster = []
-	research_points = 0
-	unlocked_techs = []
 
 func in_campaign() -> bool:
 	return campaign_id != ""
@@ -155,8 +161,46 @@ func apply_roster(scenario: Dictionary) -> Dictionary:
 
 # ------------------------------------------------------------------ tech tree
 
+# Load the global progression pool from disk (or seed a fresh one). Only strings
+# and an int are read, so this is safe to call before other autoloads are ready.
+func _load_progress() -> void:
+	if not FileAccess.file_exists(PROGRESS_SAVE_PATH):
+		reset_progress()
+		return
+	var f := FileAccess.open(PROGRESS_SAVE_PATH, FileAccess.READ)
+	if f == null:
+		reset_progress()
+		return
+	var data = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(data) != TYPE_DICTIONARY:
+		reset_progress()
+		return
+	research_points = int(data.get("research_points", RESEARCH_START))
+	unlocked_techs = []
+	for tid in data.get("unlocked_techs", []):
+		unlocked_techs.append(String(tid))
+
+func _save_progress() -> void:
+	var f := FileAccess.open(PROGRESS_SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify({
+		"research_points": research_points,
+		"unlocked_techs": unlocked_techs,
+	}))
+	f.close()
+
+# Reset the global progression to its initial seed (and persist it). Used by a
+# "new game"-style reset and by tests that need a known starting state.
+func reset_progress() -> void:
+	research_points = RESEARCH_START
+	unlocked_techs = []
+	_save_progress()
+
 func award_research(points: int) -> void:
 	research_points += points
+	_save_progress()
 
 # Lounge upgrade: spend research points to promote a carried veteran (+1 rank).
 const PROMOTE_COST := 4
@@ -172,6 +216,7 @@ func promote_roster_unit(i: int) -> bool:
 		return false
 	research_points -= PROMOTE_COST
 	campaign_roster[i]["rank"] = int(campaign_roster[i].get("rank", 0)) + 1
+	_save_progress()
 	return true
 
 func tech_unlocked(tech_id: String) -> bool:
@@ -199,6 +244,7 @@ func unlock_tech(tech_id: String) -> bool:
 		return false
 	research_points -= int(DataLoader.techs[tech_id].get("cost", 0))
 	unlocked_techs.append(tech_id)
+	_save_progress()
 	return true
 
 # Aggregate additive stat modifiers from all unlocked techs that apply to a unit

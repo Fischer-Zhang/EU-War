@@ -1,8 +1,8 @@
 extends SceneTree
 
-# Verifies the campaign tech tree: starting points, prerequisite gating, point
-# spending, modifier aggregation by unit type, and that a campaign battle folds
-# an unlocked tech's bonus into a real unit's combat modifiers.
+# Verifies the GLOBAL tech tree: starting points, prerequisite gating, point
+# spending, modifier aggregation by unit type, persistence across a reload, and
+# that a battle folds an unlocked tech's bonus into a real unit's combat mods.
 
 var fails := 0
 
@@ -23,6 +23,7 @@ func _run() -> void:
 
 	var cid = String(dl.campaigns.keys()[0])
 	gs.start_campaign(cid)
+	gs.reset_progress()   # global pool — start from a known seed (also clears any prior save)
 	ok(gs.research_points == gs.RESEARCH_START, "starts with RESEARCH_START points")
 	ok(gs.unlocked_techs.is_empty(), "no techs unlocked at start")
 	ok(gs.tech_mods_for("longbowmen")["attack"] == 0, "no bonus before unlocking")
@@ -74,6 +75,18 @@ func _run() -> void:
 		ok(false, "found a player longbow to check (battle 1 = Crecy has longbows)")
 	b.queue_free()
 	await process_frame
+
+	# Persistence: awards/unlocks are written to disk and survive a fresh reload.
+	gs.reset_progress()
+	gs.award_research(7)              # saved -> RESEARCH_START + 7
+	gs.unlock_tech("longbow_mastery")  # cost 2, saved
+	var saved_points = gs.research_points
+	var saved_techs = gs.unlocked_techs.duplicate()
+	gs.research_points = -1
+	gs.unlocked_techs = []
+	gs._load_progress()              # simulate a fresh app launch
+	ok(gs.research_points == saved_points, "research points persist across reload (%d)" % gs.research_points)
+	ok(gs.unlocked_techs == saved_techs, "unlocked techs persist across reload")
 
 	# Tech screen UI: builds a row per tech, and its unlock button works.
 	gs.research_points = 20

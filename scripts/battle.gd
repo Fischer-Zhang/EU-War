@@ -936,7 +936,8 @@ func _close_tutorial() -> void:
 # units as a persistent self-effect, which CombatModifiers.for_unit already folds
 # into attack/defense/vs_armor/move/vision. No-op outside a campaign.
 func _apply_tech_bonuses() -> void:
-	if not GameState.in_campaign() or GameState.unlocked_techs.is_empty():
+	# Global tech: unlocked upgrades apply to player units in every mode.
+	if GameState.unlocked_techs.is_empty():
 		return
 	for u in units:
 		if u.faction_id != player_faction:
@@ -1108,10 +1109,14 @@ func _end_battle(w: String) -> void:
 	_deselect()
 	_close_tutorial()
 	var player_won := w == player_faction
+	# Global tech: any real (non-self-play) player win earns research, in every
+	# mode. Self-play is a headless validation harness — it must not touch the
+	# persisted progression pool.
+	if player_won and not _fast_mode:
+		GameState.award_research(GameState.RESEARCH_PER_WIN)
 	# Campaign: banking survivors (with XP/rank) and advancing happens on a win.
 	if GameState.in_campaign() and player_won:
 		GameState.capture_roster(_living_units_of(player_faction))
-		GameState.award_research(GameState.RESEARCH_PER_WIN)
 		GameState.advance_campaign()
 	# Conquest: apply the battle to the strategic map (capture on an attack win,
 	# secure/lose on a defense). Read the mode before resolving clears it.
@@ -1137,7 +1142,7 @@ func _end_battle(w: String) -> void:
 			lines.append("  %s %s" % ["[color=#7fd08f]✓[/color]" if s.done else "[color=#888]✗[/color]", s.name])
 			if s.done:
 				done_count += 1
-		if GameState.in_campaign() and done_count > 0:
+		if done_count > 0 and not _fast_mode:
 			GameState.award_research(done_count)
 			lines.append("  [color=#e0c060]達成 %d 項 · +%d 研發點數[/color]" % [done_count, done_count])
 	if GameState.in_campaign():

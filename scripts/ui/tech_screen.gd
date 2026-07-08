@@ -9,11 +9,7 @@ var _points_label: Label
 var _list: VBoxContainer
 
 func _ready() -> void:
-	if not GameState.in_campaign():
-		# No campaign context — nothing to research; bounce to the menu.
-		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
-		return
-
+	# Global tech: reachable from the main menu with no campaign context.
 	var bg := ColorRect.new()
 	bg.color = Color(0.08, 0.09, 0.11)
 	bg.anchor_right = 1.0
@@ -41,7 +37,7 @@ func _ready() -> void:
 	vbox.add_child(_points_label)
 
 	var hint := Label.new()
-	hint.text = "每場勝利獲得研發點數。解鎖科技為全軍相應兵種提供永久加成(當前戰役有效)。"
+	hint.text = "任何模式的每場勝利都獲得研發點數(全域共用、自動存檔)。解鎖科技為全軍相應兵種提供永久加成,於所有模式生效。"
 	hint.add_theme_font_size_override("font_size", 14)
 	hint.modulate = Color(0.75, 0.78, 0.82)
 	vbox.add_child(hint)
@@ -57,9 +53,13 @@ func _ready() -> void:
 	scroll.add_child(_list)
 
 	var back := Button.new()
-	back.text = "返回整備室"
+	# Return to wherever we came from: the lounge exists only inside a campaign,
+	# otherwise we were opened from the main menu.
+	var from_lounge := GameState.in_campaign()
+	back.text = "返回整備室" if from_lounge else "返回主選單"
 	back.custom_minimum_size = Vector2(0, 44)
-	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/lounge.tscn"))
+	var dest := "res://scenes/lounge.tscn" if from_lounge else "res://scenes/main_menu.tscn"
+	back.pressed.connect(func(): get_tree().change_scene_to_file(dest))
 	vbox.add_child(back)
 
 	_rebuild()

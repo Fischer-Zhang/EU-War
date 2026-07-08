@@ -8,6 +8,7 @@ func _ready() -> void:
 	quit_button.pressed.connect(_on_quit_pressed)
 	_add_campaign_button()
 	_add_conquest_button()
+	_add_tech_button()
 	_add_help_button()
 	single_battle_button.grab_focus()
 
@@ -51,6 +52,26 @@ func _add_conquest_button() -> void:
 	btn.pressed.connect(_on_conquest_pressed)
 	vbox.add_child(btn)
 	vbox.move_child(btn, quit_button.get_index())
+
+# Global tech tree entry. Only shown when techs are defined. Opens in global
+# (no campaign/conquest) context so the screen's "back" returns to this menu.
+func _add_tech_button() -> void:
+	if DataLoader.techs.is_empty():
+		return
+	var vbox := single_battle_button.get_parent()
+	var btn := Button.new()
+	btn.text = "科技研發"
+	btn.custom_minimum_size = single_battle_button.custom_minimum_size
+	btn.add_theme_font_size_override("font_size",
+		single_battle_button.get_theme_font_size("font_size"))
+	btn.pressed.connect(_on_tech_pressed)
+	vbox.add_child(btn)
+	vbox.move_child(btn, quit_button.get_index())
+
+func _on_tech_pressed() -> void:
+	GameState.clear_campaign()
+	GameState.clear_conquest()
+	get_tree().change_scene_to_file("res://scenes/tech_screen.tscn")
 
 func _on_single_battle_pressed() -> void:
 	GameState.clear_campaign()
