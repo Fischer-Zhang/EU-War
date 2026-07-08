@@ -28,4 +28,7 @@ echo "  tools compile"
 echo "== data validator =="
 python3 tools/validate_data.py
 
+echo "== balance gate =="
+python3 tools/balance_report.py --check
+
 echo "validate_fast: OK"
