@@ -1100,7 +1100,7 @@ func _on_result_button() -> void:
 			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 		else:
 			# Next battle on a win (index already advanced), or retry on a loss;
-			# either way current_scenario_id points at the scenario to load.
-			get_tree().change_scene_to_file("res://scenes/briefing.tscn")
+			# either way the lounge leads into the correct scenario's briefing.
+			get_tree().change_scene_to_file("res://scenes/lounge.tscn")
 		return
 	get_tree().change_scene_to_file("res://scenes/scenario_select.tscn")

@@ -77,7 +77,7 @@ func _on_scenario_picked(scenario_id: String) -> void:
 
 func _on_campaign_picked(campaign_id: String) -> void:
 	GameState.start_campaign(campaign_id)
-	get_tree().change_scene_to_file("res://scenes/briefing.tscn")
+	get_tree().change_scene_to_file("res://scenes/lounge.tscn")
 
 func _on_back_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")

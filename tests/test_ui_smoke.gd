@@ -10,6 +10,7 @@ const SCENES := [
 	"res://scenes/briefing.tscn",
 	"res://scenes/deployment.tscn",
 	"res://scenes/battle.tscn",
+	"res://scenes/help.tscn",
 ]
 
 func _init() -> void:

@@ -158,6 +158,22 @@ func apply_roster(scenario: Dictionary) -> Dictionary:
 func award_research(points: int) -> void:
 	research_points += points
 
+# Lounge upgrade: spend research points to promote a carried veteran (+1 rank).
+const PROMOTE_COST := 4
+const ROSTER_RANK_MAX := 3
+
+func can_promote_roster(i: int) -> bool:
+	return in_campaign() and i >= 0 and i < campaign_roster.size() \
+		and int(campaign_roster[i].get("rank", 0)) < ROSTER_RANK_MAX \
+		and research_points >= PROMOTE_COST
+
+func promote_roster_unit(i: int) -> bool:
+	if not can_promote_roster(i):
+		return false
+	research_points -= PROMOTE_COST
+	campaign_roster[i]["rank"] = int(campaign_roster[i].get("rank", 0)) + 1
+	return true
+
 func tech_unlocked(tech_id: String) -> bool:
 	return tech_id in unlocked_techs
 

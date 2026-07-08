@@ -57,9 +57,9 @@ func _ready() -> void:
 	scroll.add_child(_list)
 
 	var back := Button.new()
-	back.text = "返回作戰簡報"
+	back.text = "返回整備室"
 	back.custom_minimum_size = Vector2(0, 44)
-	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/briefing.tscn"))
+	back.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/lounge.tscn"))
 	vbox.add_child(back)
 
 	_rebuild()
