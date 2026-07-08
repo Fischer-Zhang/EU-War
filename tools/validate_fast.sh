@@ -16,7 +16,7 @@ fi
 echo "  project pinned to Godot 4.2 GL Compatibility"
 
 echo "== JSON syntax =="
-for f in data/units.json data/terrains.json data/generals.json data/scenarios/*.json; do
+for f in data/units.json data/terrains.json data/generals.json data/campaigns.json data/techs.json data/conquest.json data/help.json data/scenarios/*.json; do
   python3 -c "import json,sys; json.load(open(sys.argv[1], encoding='utf-8'))" "$f"
 done
 echo "  all JSON parses"
