@@ -29,6 +29,33 @@ var _obj_attack: Array = []      # hexes THIS faction must take/hold to win
 var _obj_defend: Array = []      # hexes we must deny the enemy (their goals)
 var _pressing: bool = false      # own living count > enemy living count
 
+class CandidateMap:
+	extends RefCounted
+	var base_map
+	var mover
+	var original_coord: Vector2i
+	var candidate_coord: Vector2i
+
+	func _init(_base_map, _mover, _original_coord: Vector2i, _candidate_coord: Vector2i) -> void:
+		base_map = _base_map
+		mover = _mover
+		original_coord = _original_coord
+		candidate_coord = _candidate_coord
+
+	func terrain_at(c: Vector2i) -> String:
+		return base_map.terrain_at(c)
+
+	func blocks_los_at(c: Vector2i) -> bool:
+		return base_map.blocks_los_at(c)
+
+	func unit_at(c: Vector2i):
+		if c == candidate_coord:
+			return mover
+		if c == original_coord:
+			var occupant = base_map.unit_at(c)
+			return null if occupant == mover else occupant
+		return base_map.unit_at(c)
+
 # An order the battle executes: move along `path` (start..dest), then act.
 class Order:
 	var unit                      # Unit to act
@@ -130,7 +157,6 @@ func plan_unit(unit, units: Array, hex_map, factions: Dictionary) -> Order:
 	var faction: String = unit.faction_id
 	var unit_def: Dictionary = DataLoader.get_unit_def(unit.type_id)
 	var general_def: Dictionary = DataLoader.get_general_def(unit.general_id)
-	var visible: Dictionary = Visibility.compute_visible_hexes(units, faction, hex_map, DataLoader.units)
 
 	var pmods := _posture_mods(String(factions.get(faction, {}).get("posture", "balanced")))
 	var occupied := _occupancy(units)
@@ -147,7 +173,9 @@ func plan_unit(unit, units: Array, hex_map, factions: Dictionary) -> Order:
 	var best_score := -INF
 	var best: Order = order
 	for cand in candidates:
-		var eval := _score_destination(unit, cand, unit_def, general_def, units, hex_map, visible, faction, pmods)
+		var ctx := _candidate_context(unit, cand, units, hex_map, faction)
+		var eval := _score_destination(
+			unit, cand, unit_def, general_def, units, ctx["map"], ctx["visible"], faction, pmods)
 		var score: float = eval["score"]
 		if score > best_score:
 			best_score = score
@@ -159,13 +187,26 @@ func plan_unit(unit, units: Array, hex_map, factions: Dictionary) -> Order:
 			best.target = eval["target"]
 			best.action = eval["action"]
 
-	# Easy occasionally fumbles the destination (deterministic: keyed off unit coord).
-	if weights.get("misplay", false) and best.target == null and not best.path.is_empty():
+	# Easy occasionally fumbles a moving order (deterministic: keyed off unit coord).
+	# Recomputing candidate visibility lets every difficulty find move-then-fire
+	# attacks; keep Easy's intended gap by allowing that same fumble to affect a
+	# newly discovered attack that requires movement.
+	if weights.get("misplay", false) and not best.path.is_empty():
 		if (absi(unit.coord.x * 7 + unit.coord.y * 13)) % 5 == 0:
 			best.path = []
 			best.dest = unit.coord
+			best.target = null
 			best.action = "wait"
 	return best
+
+func _candidate_context(unit, cand: Vector2i, units: Array, hex_map, faction: String) -> Dictionary:
+	var original: Vector2i = unit.coord
+	var candidate_map := CandidateMap.new(hex_map, unit, original, cand)
+	unit.coord = cand
+	var visible := Visibility.compute_visible_hexes(
+		units, faction, candidate_map, DataLoader.units, DataLoader.generals)
+	unit.coord = original
+	return {"map": candidate_map, "visible": visible}
 
 # Per-faction posture multipliers on cover / exposure-aversion / advance drive.
 static func _posture_mods(posture: String) -> Dictionary:

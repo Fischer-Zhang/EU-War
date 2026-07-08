@@ -32,7 +32,11 @@ static func has_los(
 	return true
 
 static func compute_visible_hexes(
-	units: Array, faction_id: String, hex_map, unit_defs: Dictionary = {}
+	units: Array,
+	faction_id: String,
+	hex_map,
+	unit_defs: Dictionary = {},
+	general_defs: Dictionary = {},
 ) -> Dictionary:
 	# Returns the set of hexes (Dictionary[Vector2i, true]) visible to any living
 	# unit of `faction_id`.
@@ -42,7 +46,7 @@ static func compute_visible_hexes(
 		if not unit.is_alive() or unit.faction_id != faction_id:
 			continue
 		var unit_def: Dictionary = unit_defs.get(unit.type_id, {})
-		var vision: int = int(unit_def.get("vision", 3))
+		var vision := _effective_vision_for(unit, unit_def, general_defs)
 		visible[unit.coord] = true
 		for c in HexCoord.range_within(unit.coord, vision):
 			var coord: Vector2i = c
@@ -51,3 +55,12 @@ static func compute_visible_hexes(
 			if has_los(unit.coord, coord, hex_map, faction_id):
 				visible[coord] = true
 	return visible
+
+static func _effective_vision_for(unit, unit_def: Dictionary, general_defs: Dictionary) -> int:
+	if unit != null and unit.has_method("effective_vision"):
+		var general_def := {}
+		var general_id = unit.get("general_id")
+		if general_id != null and String(general_id) != "":
+			general_def = general_defs.get(String(general_id), {})
+		return int(unit.effective_vision(unit_def, general_def))
+	return int(unit_def.get("vision", 3))

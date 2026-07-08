@@ -612,7 +612,7 @@ func _refresh_visibility() -> void:
 	hex_map.apply_visibility(vis, player_faction)
 
 func _visible_for(faction_id: String) -> Dictionary:
-	return Visibility.compute_visible_hexes(_living_units(), faction_id, hex_map, DataLoader.units)
+	return Visibility.compute_visible_hexes(_living_units(), faction_id, hex_map, DataLoader.units, DataLoader.generals)
 
 func _recover_morale(u: Unit) -> void:
 	if _adjacent_enemy_count(u) == 0 and u.morale < u.morale_max:
