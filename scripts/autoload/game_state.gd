@@ -170,20 +170,26 @@ func tech_mods_for(type_id: String) -> Dictionary:
 # ------------------------------------------------------------------ conquest
 
 var conquest_id: String = ""
-var conquest_owner: Dictionary = {}   # territory_id -> "player" | "enemy"
-var conquest_target: String = ""      # territory currently being attacked
+var conquest_owner: Dictionary = {}       # territory_id -> "player" | "enemy"
+var conquest_secured: Dictionary = {}     # territory_id -> true (held off a counter)
+var conquest_battle: Dictionary = {}      # current battle {territory, defense:bool}
+var conquest_enemy_target: String = ""    # queued enemy counter-attack to defend
 
 func start_conquest(id: String) -> void:
 	conquest_id = id
 	conquest_owner = {}
-	conquest_target = ""
+	conquest_secured = {}
+	conquest_battle = {}
+	conquest_enemy_target = ""
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", "enemy"))
 
 func clear_conquest() -> void:
 	conquest_id = ""
 	conquest_owner = {}
-	conquest_target = ""
+	conquest_secured = {}
+	conquest_battle = {}
+	conquest_enemy_target = ""
 
 func in_conquest() -> bool:
 	return conquest_id != ""
@@ -197,32 +203,77 @@ func conquest_territory(tid: String) -> Dictionary:
 			return t
 	return {}
 
+# Effective (undirected) neighbours of a territory — own links plus any territory
+# that links to it, so asymmetric data still works.
+func _conquest_neighbors(tid: String) -> Array:
+	var out := {}
+	for nb in conquest_territory(tid).get("links", []):
+		out[String(nb)] = true
+	for other in conquest_territories():
+		if tid in other.get("links", []):
+			out[String(other.get("id", ""))] = true
+	return out.keys()
+
+func _adjacent_owned_by(tid: String, side: String) -> bool:
+	for nb in _conquest_neighbors(tid):
+		if String(conquest_owner.get(nb, "")) == side:
+			return true
+	return false
+
 # Enemy-owned AND on the frontline (adjacent to a player-owned territory).
 func territory_attackable(tid: String) -> bool:
 	if String(conquest_owner.get(tid, "")) != "enemy":
 		return false
-	var t := conquest_territory(tid)
-	for nb in t.get("links", []):
-		if String(conquest_owner.get(String(nb), "")) == "player":
-			return true
-	# Robustness against asymmetric links: also check reverse adjacency.
-	for other in conquest_territories():
-		if String(conquest_owner.get(String(other.get("id", "")), "")) == "player" \
-				and tid in other.get("links", []):
-			return true
-	return false
+	return _adjacent_owned_by(tid, "player")
+
+# The enemy's strategic pick: a player-held, battle-bearing frontier territory it
+# hasn't been repelled from yet. "" if it has no valid counter-attack.
+func _enemy_pick_target() -> String:
+	for t in conquest_territories():
+		var tid := String(t.get("id", ""))
+		if String(conquest_owner.get(tid, "")) != "player":
+			continue
+		if String(t.get("scenario", "")) == "" or conquest_secured.has(tid):
+			continue
+		if _adjacent_owned_by(tid, "enemy"):
+			return tid
+	return ""
+
+func has_enemy_counter() -> bool:
+	return conquest_enemy_target != ""
 
 func begin_conquest_attack(tid: String) -> bool:
-	if not territory_attackable(tid):
+	if conquest_enemy_target != "" or not territory_attackable(tid):
 		return false
-	conquest_target = tid
+	conquest_battle = {"territory": tid, "defense": false}
 	current_scenario_id = String(conquest_territory(tid).get("scenario", ""))
 	return true
 
-func capture_conquest_target() -> void:
-	if conquest_target != "":
-		conquest_owner[conquest_target] = "player"
-		conquest_target = ""
+func begin_conquest_defense() -> bool:
+	if conquest_enemy_target == "":
+		return false
+	conquest_battle = {"territory": conquest_enemy_target, "defense": true}
+	current_scenario_id = String(conquest_territory(conquest_enemy_target).get("scenario", ""))
+	return true
+
+# Apply a finished battle to the strategic map and advance the turn.
+func resolve_conquest_battle(player_won: bool) -> void:
+	var tid := String(conquest_battle.get("territory", ""))
+	var defense: bool = bool(conquest_battle.get("defense", false))
+	conquest_battle = {}
+	if tid == "":
+		return
+	if defense:
+		if player_won:
+			conquest_secured[tid] = true         # repelled the counter — now safe
+		else:
+			conquest_owner[tid] = "enemy"          # territory retaken
+		conquest_enemy_target = ""                 # enemy's turn is spent
+	else:
+		if player_won:
+			conquest_owner[tid] = "player"
+		# The enemy immediately queues its counter-attack (if it has one).
+		conquest_enemy_target = _enemy_pick_target()
 
 func conquest_won() -> bool:
 	if not in_conquest():

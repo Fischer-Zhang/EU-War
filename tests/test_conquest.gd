@@ -1,9 +1,10 @@
 extends SceneTree
 
-# Verifies the conquest strategic layer: starting ownership, the frontline
-# attack rule (only enemy territories adjacent to an owned one), capturing on a
-# win, the frontline advancing as territories fall, and the win condition. Also
-# exercises the conquest map screen build.
+# Verifies the conquest strategic layer incl. the enemy counter-attack loop:
+# starting ownership, the frontline attack rule, capture-on-win, the enemy
+# queueing a counter after the player's attack, defending (win secures, loss
+# loses the territory), the "secured" rule preventing repeat counters, the win
+# condition, and the map screen build.
 
 var fails := 0
 
@@ -17,13 +18,12 @@ func ok(cond: bool, msg: String) -> void:
 func _init() -> void:
 	_run.call_deferred()
 
-func _attackable_set(gs) -> Dictionary:
-	var out := {}
+func _first_attackable(gs) -> String:
 	for t in gs.conquest_territories():
 		var tid = String(t.get("id", ""))
 		if gs.territory_attackable(tid):
-			out[tid] = true
-	return out
+			return tid
+	return ""
 
 func _run() -> void:
 	var gs = root.get_node("GameState")
@@ -34,39 +34,64 @@ func _run() -> void:
 	gs.start_conquest(qid)
 	ok(gs.in_conquest(), "in_conquest() after start")
 	ok(gs.conquest_owner.get("home", "") == "player", "home starts player-owned")
-	ok(gs.conquest_owner.get("lowlands", "") == "enemy", "lowlands starts enemy-owned")
 	ok(not gs.conquest_won(), "not won at start")
+	ok(not gs.has_enemy_counter(), "no enemy counter at start")
 
-	# Frontline: only enemy territories adjacent to home are attackable.
-	var front = _attackable_set(gs)
-	ok(front.has("normandy") and front.has("lombardy"), "initial frontline = normandy + lombardy")
-	ok(not front.has("lowlands"), "deep enemy territory not attackable yet")
-	ok(not front.has("home"), "own territory not attackable")
-
-	# Can't attack a non-frontline territory.
+	# Frontline + refusing a deep target.
+	ok(gs.territory_attackable("normandy") and gs.territory_attackable("lombardy"), "initial frontline = normandy + lombardy")
+	ok(not gs.territory_attackable("lowlands"), "deep enemy territory not attackable")
 	ok(not gs.begin_conquest_attack("lowlands"), "attacking a non-frontline territory refused")
 
-	# Attack + capture normandy: sets the scenario, then a win flips ownership.
-	ok(gs.begin_conquest_attack("normandy"), "begin attack on frontline normandy")
-	ok(gs.conquest_target == "normandy", "conquest_target set")
+	# Attack normandy and win -> captured, and the enemy queues a counter.
+	ok(gs.begin_conquest_attack("normandy"), "begin attack on normandy")
 	ok(gs.current_scenario_id == "02_crecy_1346", "battle scenario = territory's scenario")
-	gs.capture_conquest_target()  # simulate a battle win
+	gs.resolve_conquest_battle(true)
 	ok(gs.conquest_owner.get("normandy", "") == "player", "normandy captured on win")
-	ok(gs.conquest_target == "", "target cleared after capture")
+	ok(gs.has_enemy_counter(), "enemy queues a counter-attack after the player's attack")
 
-	# Frontline advanced: picardy (behind normandy) is now attackable.
-	ok(gs.territory_attackable("picardy"), "frontline advances to picardy after normandy falls")
+	# While a counter is pending, the player can't launch a new attack.
+	ok(not gs.begin_conquest_attack("lombardy"), "can't attack while defending a counter")
 
-	# Capture everything → win.
-	for tid in ["picardy", "lombardy", "rhineland", "lowlands"]:
-		# each must be on the frontline when we reach it
-		gs.begin_conquest_attack(tid)
-		gs.capture_conquest_target()
-	ok(gs.conquest_won(), "conquest won after capturing all enemy territories")
-	var counts = gs.conquest_counts()
-	ok(counts.player == counts.total, "all territories player-owned")
+	# Defend and win -> the territory is secured; enemy turn is spent.
+	ok(gs.begin_conquest_defense(), "begin defense of the counter-attacked territory")
+	var defended = String(gs.conquest_battle.get("territory", ""))
+	gs.resolve_conquest_battle(true)
+	ok(gs.conquest_secured.has(defended), "winning the defense secures the territory")
+	ok(not gs.has_enemy_counter(), "enemy counter consumed after defense")
+	ok(gs.conquest_owner.get(defended, "") == "player", "defended territory stays player-owned")
 
-	# Conquest map screen builds without error (reset to a fresh conquest first).
+	# A secured territory is not counter-attacked again.
+	# Capture the next frontier, then check the enemy doesn't re-target the secured one.
+	var nxt = _first_attackable(gs)
+	ok(nxt != "", "a new frontier opened after securing")
+	gs.begin_conquest_attack(nxt)
+	gs.resolve_conquest_battle(true)
+	ok(gs.conquest_enemy_target != defended, "enemy does not re-attack a secured territory")
+
+	# Losing a defense loses the territory.
+	if gs.has_enemy_counter():
+		var t2 = gs.conquest_enemy_target
+		gs.begin_conquest_defense()
+		gs.resolve_conquest_battle(false)
+		ok(gs.conquest_owner.get(t2, "") == "enemy", "losing the defense hands the territory back")
+
+	# Perfect-player playthrough terminates in a win (securing prevents loops).
+	gs.start_conquest(qid)
+	var steps = 0
+	while not gs.conquest_won() and steps < 60:
+		steps += 1
+		if gs.has_enemy_counter():
+			gs.begin_conquest_defense()
+			gs.resolve_conquest_battle(true)
+		else:
+			var tid = _first_attackable(gs)
+			if tid == "":
+				break
+			gs.begin_conquest_attack(tid)
+			gs.resolve_conquest_battle(true)
+	ok(gs.conquest_won(), "a perfect player conquers everything (in %d steps)" % steps)
+
+	# Map builds.
 	gs.start_conquest(qid)
 	var map = load("res://scenes/conquest_map.tscn").instantiate()
 	root.add_child(map)

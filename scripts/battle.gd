@@ -941,9 +941,12 @@ func _end_battle(w: String) -> void:
 		GameState.capture_roster(_living_units_of(player_faction))
 		GameState.award_research(GameState.RESEARCH_PER_WIN)
 		GameState.advance_campaign()
-	# Conquest: a win captures the attacked territory.
-	if GameState.in_conquest() and player_won:
-		GameState.capture_conquest_target()
+	# Conquest: apply the battle to the strategic map (capture on an attack win,
+	# secure/lose on a defense). Read the mode before resolving clears it.
+	var conq_defense := false
+	if GameState.in_conquest():
+		conq_defense = bool(GameState.conquest_battle.get("defense", false))
+		GameState.resolve_conquest_battle(player_won)
 	result_label.text = "勝利!" if player_won else "戰敗"
 	result_label.modulate = Color(0.4, 0.9, 0.4) if player_won else Color(0.9, 0.4, 0.4)
 	var lines := []
@@ -961,10 +964,14 @@ func _end_battle(w: String) -> void:
 			lines.append("再接再厲——可重試本場。")
 	elif GameState.in_conquest():
 		lines.append("")
-		if player_won:
-			lines.append("[color=#e0c060]已佔領該領地![/color]" if not GameState.conquest_won() else "[color=#e0c060]征服完成——全境臣服![/color]")
+		if conq_defense:
+			lines.append("[color=#e0c060]成功守住領地——已鞏固![/color]" if player_won else "領地失守,被敵軍奪回。")
+		elif player_won:
+			lines.append("[color=#e0c060]征服完成——全境臣服![/color]" if GameState.conquest_won() else "[color=#e0c060]已佔領該領地![/color]")
 		else:
 			lines.append("進攻受挫——可重整後再攻。")
+		if GameState.has_enemy_counter():
+			lines.append("⚠ 敵軍正反攻你的前線——返回地圖迎戰。")
 	result_summary.text = "\n".join(lines)
 	menu_button.text = _result_button_text(player_won)
 	result_panel.visible = true
