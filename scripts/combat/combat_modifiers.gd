@@ -1,9 +1,12 @@
 class_name CombatModifiers
 extends RefCounted
 
+const CombatEffects := preload("res://scripts/combat/combat_effects.gd")
+
 # Aggregates per-unit stat modifiers from:
 #   1. Veteran rank (in-battle XP progression)
 #   2. An attached commander's bonuses (scenario assignment)
+#   3. Suppression penalties and active skill / tech effects
 #
 # Feeds CombatResolver.resolve and Unit.effective_move / effective_vision.
 
@@ -41,6 +44,9 @@ static func for_unit(unit, general_def: Dictionary = {}) -> Dictionary:
 	if unit.rank >= 3:
 		mods.move += 1
 		mods.vision += 1
+	var suppression_value = unit.get("suppression")
+	if suppression_value != null:
+		mods.attack -= CombatEffects.attack_penalty(int(suppression_value))
 	# Commander bonuses (only if the unit's type is in applies_to)
 	if not general_def.is_empty():
 		var applies: Array = general_def.get("applies_to", [])

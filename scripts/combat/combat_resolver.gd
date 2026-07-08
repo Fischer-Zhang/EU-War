@@ -7,8 +7,8 @@ const CombatEffects := preload("res://scripts/combat/combat_effects.gd")
 # Deterministic combat resolution.
 # Damage scales with the attacker's current HP — a bloodied formation hits softer.
 # The defender counter-attacks if it survives, the attacker is in its reach, and
-# it can retaliate (melee/short reach; guns and cannon in a firefight can trade,
-# but indirect artillery cannot counter a charge). Counter damage is halved.
+# it can retaliate (melee/short reach; guns can trade fire, but indirect pieces
+# and no_counter crews cannot counter). Counter damage is halved.
 #
 # `armor` models heavy plate / barding (knights, gendarmes, cuirassiers) and
 # `vs_armor` the bonus of pikes, halberds and cannon that punch through it.
@@ -52,7 +52,9 @@ static func resolve(
 
 	# Counter-attack: defender must survive, attacker must be in the defender's
 	# reach, and the defender must be able to retaliate — indirect pieces (mortar)
-	# and no_counter crews (field guns) never counter a charge.
+	# and no_counter crews (field guns) never counter. Counter damage uses the
+	# defender_mods passed at attack start, so suppression caused by this same hit
+	# affects future actions, not the simultaneous reply.
 	var def_range := int(def_def.get("range", 1))
 	var cannot_counter: bool = def_def.get("indirect", false) or def_def.get("no_counter", false)
 	if not suppress_counter and not out.defender_dies and distance <= def_range and not cannot_counter:

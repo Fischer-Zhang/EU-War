@@ -3,6 +3,20 @@ extends SceneTree
 # CombatResolver tests — defs passed directly, no DataLoader needed.
 
 const CombatResolver := preload("res://scripts/combat/combat_resolver.gd")
+const CombatEffects := preload("res://scripts/combat/combat_effects.gd")
+const CombatModifiers := preload("res://scripts/combat/combat_modifiers.gd")
+
+class StubUnit:
+	extends RefCounted
+	var type_id: String
+	var rank: int = 0
+	var suppression: int = 0
+	var active_effects: Array = []
+	func _init(t: String, s: int = 0) -> void:
+		type_id = t
+		suppression = s
+	func aggregated_self_mods() -> Dictionary:
+		return {"attack": 0, "defense": 0, "vs_armor": 0, "move": 0, "vision": 0}
 
 func _init() -> void:
 	var pass_count := 0
@@ -11,8 +25,10 @@ func _init() -> void:
 	var pikemen := {"id": "pikemen", "hp": 12, "attack": 4, "defense": 3, "range": 1, "vs_armor": 4, "armor": 1}
 	var knight := {"id": "heavy_cavalry", "hp": 16, "attack": 8, "defense": 5, "range": 1, "vs_armor": 2, "armor": 5}
 	var longbow := {"id": "longbowmen", "hp": 9, "attack": 5, "defense": 1, "range": 2, "vs_armor": 2, "armor": 0}
+	var musket := {"id": "musketeers", "hp": 10, "attack": 7, "defense": 2, "range": 2, "vs_armor": 6, "armor": 0}
 	var skirmisher := {"id": "skirmisher", "hp": 10, "attack": 4, "defense": 2, "range": 1, "vs_armor": 1, "armor": 0}
-	var cannon := {"id": "field_cannon", "hp": 8, "attack": 8, "defense": 1, "range": 4, "vs_armor": 3, "armor": 0, "indirect": true}
+	var cannon := {"id": "field_cannon", "hp": 8, "attack": 8, "defense": 1, "range": 3, "vs_armor": 3, "armor": 0, "no_counter": true}
+	var mortar := {"id": "mortar", "hp": 8, "attack": 6, "defense": 1, "range": 3, "vs_armor": 1, "armor": 0, "indirect": true}
 	var plain := {"defense": 0}
 	var hills := {"defense": 2}
 
@@ -43,12 +59,12 @@ func _init() -> void:
 	else:
 		fail_count += 1; printerr("FAIL: wounded scaling dmg=%d" % r3.damage_to_defender)
 
-	# 5) An INDIRECT defender (cannon) never counter-attacks, even adjacent.
+	# 5) A no_counter field cannon never counter-attacks, even adjacent.
 	var r5 := CombatResolver.resolve(knight, cannon, 16, 8, plain, plain, 1)
 	if r5.counter_damage == 0:
 		pass_count += 1
 	else:
-		fail_count += 1; printerr("FAIL: indirect defender no-counter counter=%d" % r5.counter_damage)
+		fail_count += 1; printerr("FAIL: field cannon no-counter counter=%d" % r5.counter_damage)
 
 	# 6) Lethal hit flags defender_dies and drops the counter.
 	var r6 := CombatResolver.resolve(knight, longbow, 16, 3, plain, plain, 1)
@@ -64,6 +80,37 @@ func _init() -> void:
 		pass_count += 1
 	else:
 		fail_count += 1; printerr("FAIL: dig-in base=%d dug=%d" % [base, dug])
+
+	# 8) High suppression reduces attack through CombatModifiers.
+	var fresh_mods := CombatModifiers.for_unit(StubUnit.new("musketeers"), {})
+	var pinned_mods := CombatModifiers.for_unit(
+		StubUnit.new("musketeers", CombatEffects.SUPPRESSION_ATTACK_THRESHOLD), {})
+	var fresh := CombatResolver.resolve(musket, skirmisher, 10, 10, plain, plain, 2, 0, fresh_mods, {}).damage_to_defender
+	var pinned := CombatResolver.resolve(musket, skirmisher, 10, 10, plain, plain, 2, 0, pinned_mods, {}).damage_to_defender
+	if pinned < fresh:
+		pass_count += 1
+	else:
+		fail_count += 1; printerr("FAIL: suppression attack penalty fresh=%d pinned=%d" % [fresh, pinned])
+
+	# 9) Indirect mortars also cannot counter.
+	var r9 := CombatResolver.resolve(knight, mortar, 16, 8, plain, plain, 1)
+	if r9.counter_damage == 0:
+		pass_count += 1
+	else:
+		fail_count += 1; printerr("FAIL: indirect mortar counter=%d" % r9.counter_damage)
+
+	# 10) A hit that causes suppression does not weaken the simultaneous counter;
+	# the penalty applies to later actions after the hit has resolved.
+	var guarded_musket := {"id": "musketeers", "hp": 10, "attack": 8, "defense": 5, "range": 2, "vs_armor": 0, "armor": 0}
+	var defender_ready := CombatModifiers.for_unit(StubUnit.new("musketeers"), {})
+	var defender_pinned := CombatModifiers.for_unit(
+		StubUnit.new("musketeers", CombatEffects.SUPPRESSION_ATTACK_THRESHOLD), {})
+	var simultaneous := CombatResolver.resolve(longbow, guarded_musket, 9, 10, plain, plain, 2, 0, {}, defender_ready).counter_damage
+	var later := CombatResolver.resolve(longbow, guarded_musket, 9, 10, plain, plain, 2, 0, {}, defender_pinned).counter_damage
+	if simultaneous > later:
+		pass_count += 1
+	else:
+		fail_count += 1; printerr("FAIL: simultaneous counter=%d later_pinned=%d" % [simultaneous, later])
 
 	print("test_combat_resolver: %d passed, %d failed" % [pass_count, fail_count])
 	quit(1 if fail_count > 0 else 0)
