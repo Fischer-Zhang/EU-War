@@ -413,5 +413,18 @@
       "type": "eliminate",
       "by_turn": 99
     }
-  }
+  },
+  "secondary_objectives": [
+    {
+      "id": "no_losses",
+      "name": "零損固守(不失一兵)",
+      "type": "no_losses"
+    },
+    {
+      "id": "swift",
+      "name": "速勝(第 15 回合前取勝)",
+      "type": "by_turn",
+      "turn": 15
+    }
+  ]
 }

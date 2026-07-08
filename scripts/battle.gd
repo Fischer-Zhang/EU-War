@@ -21,6 +21,7 @@ const DamagePreview := preload("res://scripts/ui/damage_preview.gd")
 const DamagePopup := preload("res://scripts/ui/damage_popup.gd")
 const VictoryChecker := preload("res://scripts/scenario/victory_checker.gd")
 const ReinforcementSpawner := preload("res://scripts/scenario/reinforcement_spawner.gd")
+const SecondaryObjectives := preload("res://scripts/scenario/secondary_objectives.gd")
 const AIController := preload("res://scripts/turn/ai_controller.gd")
 
 const DEFAULT_SCENARIO := "00_tutorial"
@@ -85,6 +86,7 @@ var _fast_mode: bool = false
 var _log_label: RichTextLabel = null
 var _log_lines: Array = []
 var _spawned_reinforcements: Dictionary = {}   # reinforcement index -> true
+var _initial_player_count: int = 0              # for the "no losses" objective
 
 func _ready() -> void:
 	_fast_mode = not selfplay_difficulty.is_empty()
@@ -129,6 +131,7 @@ func _setup_scenario() -> void:
 	_apply_deploy_generals()
 	_apply_tech_bonuses()
 	_apply_conquest_bonuses()
+	_initial_player_count = _living_units_of(player_faction).size()
 	# Objective marker from a capture victory condition.
 	var vic: Dictionary = scenario.get("victory", {}).get(player_faction, {})
 	if String(vic.get("type", "")) == "capture":
@@ -1068,6 +1071,20 @@ func _end_battle(w: String) -> void:
 	lines.append("")
 	for fid in factions.keys():
 		lines.append("%s 存活部隊:%d" % [_faction_name(fid), _living_units_of(fid).size()])
+	# Secondary objectives (bonus, only when the player wins).
+	if player_won and not scenario.get("secondary_objectives", []).is_empty():
+		var secs := SecondaryObjectives.evaluate(
+			scenario, _living_units(), player_faction, turn_manager.turn_number, _initial_player_count)
+		var done_count := 0
+		lines.append("")
+		lines.append("[b]次要目標[/b]")
+		for s in secs:
+			lines.append("  %s %s" % ["[color=#7fd08f]✓[/color]" if s.done else "[color=#888]✗[/color]", s.name])
+			if s.done:
+				done_count += 1
+		if GameState.in_campaign() and done_count > 0:
+			GameState.award_research(done_count)
+			lines.append("  [color=#e0c060]達成 %d 項 · +%d 研發點數[/color]" % [done_count, done_count])
 	if GameState.in_campaign():
 		lines.append("")
 		if player_won and GameState.campaign_complete():

@@ -159,6 +159,21 @@ def main():
             elif rows[row][col] in impassable:
                 errors.append(f"{sid}: reinforcement '{r.get('name')}' on impassable {rows[row][col]}")
 
+        # Secondary objectives (optional).
+        sec_types = {"no_losses", "by_turn", "hold_hex", "eliminate_type"}
+        for o in s.get("secondary_objectives", []):
+            ot = o.get("type", "")
+            if ot not in sec_types:
+                errors.append(f"{sid}: secondary objective unknown type '{ot}'")
+            if ot == "by_turn" and not isinstance(o.get("turn"), int):
+                errors.append(f"{sid}: by_turn objective '{o.get('id')}' needs int 'turn'")
+            if ot == "eliminate_type" and o.get("unit_type") not in units:
+                errors.append(f"{sid}: eliminate_type objective '{o.get('id')}' unknown unit '{o.get('unit_type')}'")
+            if ot == "hold_hex":
+                col, row = o.get("at", [0, 0])
+                if not (0 <= row < (h or 0) and 0 <= col < (w or 0)):
+                    errors.append(f"{sid}: hold_hex objective '{o.get('id')}' off-map {o.get('at')}")
+
         # Deployment zones (optional): faction must exist, rect in bounds.
         for fid, cfg in s.get("deployment", {}).items():
             if fid not in faction_ids:

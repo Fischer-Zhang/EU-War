@@ -53,6 +53,12 @@ func _compose(scenario: Dictionary) -> String:
 			var def := DataLoader.get_unit_def(t)
 			parts.append("%s ×%d" % [String(def.get("name_zh", t)), by_faction[fid][t]])
 		lines.append("  " + " · ".join(parts))
+	var secs: Array = scenario.get("secondary_objectives", [])
+	if not secs.is_empty():
+		lines.append("")
+		lines.append("[b]次要目標(選擇性)[/b]")
+		for o in secs:
+			lines.append("  ◇ %s" % String(o.get("name", "")))
 	return "\n".join(lines)
 
 func _on_start_pressed() -> void:
