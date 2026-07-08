@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write        # create releases / upload assets
+
+jobs:
+  build:
+    name: Build desktop binaries
+    runs-on: ubuntu-latest
+    env:
+      GODOT_VERSION: "4.2.2"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          install -m 0755 "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          mv templates/* "$dest/"
+
+      - name: Import resources
+        run: godot --headless --path . --import
+
+      - name: Export desktop builds
+        run: |
+          set -euo pipefail
+          mkdir -p exports/linux exports/windows exports/macos
+          godot --headless --path . --export-release "Linux"   exports/linux/EU-War.x86_64
+          godot --headless --path . --export-release "Windows" exports/windows/EU-War.exe
+          godot --headless --path . --export-release "macOS"   exports/macos/EU-War.zip
+          ls -la exports/linux exports/windows exports/macos
+
+      - name: Package artifacts
+        run: |
+          set -euo pipefail
+          (cd exports/linux && zip -r "$GITHUB_WORKSPACE/EU-War-linux-x86_64.zip" .)
+          (cd exports/windows && zip -r "$GITHUB_WORKSPACE/EU-War-windows-x86_64.zip" .)
+          cp exports/macos/EU-War.zip EU-War-macos.zip
+          ls -la EU-War-*.zip
+
+      - name: Upload build artifacts (manual runs)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eu-war-desktop
+          path: EU-War-*.zip
+
+      - name: Publish GitHub Release (tag pushes)
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            EU-War-linux-x86_64.zip EU-War-windows-x86_64.zip EU-War-macos.zip \
+            --title "Eu-War 歐陸烽火 $GITHUB_REF_NAME" \
+            --notes "六角格戰棋(14–18 世紀)桌面版。未簽章:macOS 用右鍵→開啟,Windows 忽略 SmartScreen 提示。也可線上遊玩:https://fischer-zhang.github.io/EU-War/"

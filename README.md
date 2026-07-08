@@ -3,6 +3,7 @@
 [![CI](https://github.com/Fischer-Zhang/EU-War/actions/workflows/ci.yml/badge.svg)](https://github.com/Fischer-Zhang/EU-War/actions/workflows/ci.yml)
 
 🎮 **[線上試玩](https://fischer-zhang.github.io/EU-War/)** — 瀏覽器直接遊玩(Web 匯出)
+💾 **[下載桌面版](https://github.com/Fischer-Zhang/EU-War/releases/latest)** — Linux / Windows / macOS(未簽章:macOS 右鍵→開啟,Windows 忽略 SmartScreen)
 
 以 **Godot 4 / GDScript** 打造的回合制歐洲戰爭六角格戰棋,聚焦 **14–18 世紀**:百年戰爭的長弓與騎士、義大利戰爭的火繩槍方陣、三十年戰爭的線列火槍與野砲、路易十四與大北方戰爭的騎兵突擊。
 
@@ -137,7 +138,7 @@ tools/validate.sh        # 上述 + 全部無頭 GDScript 測試
 
 ## 路線圖
 
-**已完成**:六角移動、決定性戰鬥、回合循環;戰爭迷霧、視線、ZoC、壓制、士氣/潰散、整隊、工事、嚴陣;老兵經驗與歷史將領;主選單→選劇本→簡報→戰鬥流程;互動式基礎教學劇本 + 9 場歷史戰役 + 演武場;戰前部署階段;戰役串接(roster 與老兵經驗延續)與戰役科技樹;征服戰略層(前線攻略、領地佔領、敵方反攻與防守);AI 防守行為與自我對戰驗證;無頭測試與資料驗證;Web 匯出與 GitHub Pages 線上試玩。
+**已完成**:六角移動、決定性戰鬥、回合循環;戰爭迷霧、視線、ZoC、壓制、士氣/潰散、整隊、工事、嚴陣;老兵經驗與歷史將領;主選單→選劇本→簡報→戰鬥流程;互動式基礎教學劇本 + 9 場歷史戰役 + 演武場;戰前部署階段;戰役串接(roster 與老兵經驗延續)與戰役科技樹;征服戰略層(前線攻略、領地佔領、敵方反攻與防守);AI 防守行為與自我對戰驗證;無頭測試與資料驗證;Web 匯出與 GitHub Pages 線上試玩;桌面匯出(Linux/Windows/macOS)與 tag 觸發的 GitHub Releases。
 
 **開放中**:部署點數系統(讓單位 `cost` 生效)、征服與 roster/科技整合、防守戰的鏡像布陣(避免重玩同一場)、更多戰役與美術替換。
 
