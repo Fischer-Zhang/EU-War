@@ -122,7 +122,21 @@ func _connect_ui() -> void:
 	rally_button.pressed.connect(_on_rally_pressed)
 	menu_button.pressed.connect(_on_result_button)
 	result_panel.visible = false
+	_make_hud_clickthrough()
 	_update_action_buttons()
+
+# Display-only HUD elements must let clicks pass through to the map, or the hexes
+# they overlap can't be clicked. Only the actual buttons keep capturing input.
+func _make_hud_clickthrough() -> void:
+	for c in [info_label, status_label, turn_banner, $UI/ActionDock]:
+		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ignore_mouse_recursive($UI/ActionDock/InfoPanel)
+
+func _ignore_mouse_recursive(n: Node) -> void:
+	if n is Control:
+		n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in n.get_children():
+		_ignore_mouse_recursive(child)
 
 # ------------------------------------------------------------------ turn flow
 
@@ -367,6 +381,11 @@ func _on_hex_clicked(coord: Vector2i, _terrain_id: String) -> void:
 	if selected_unit != null and not selected_unit.has_moved and move_targets.has(coord):
 		_move_selected(coord)
 		return
+	# Inspect a visible enemy: show its stats without changing your selection.
+	if clicked != null and clicked.faction_id != player_faction and clicked.visible:
+		_render_unit_info(clicked)
+		_flash_status("檢視敵軍:%s" % clicked.display_name)
+		return
 	_deselect()
 
 func _select(u: Unit) -> void:
@@ -580,10 +599,15 @@ func _update_selected_panel() -> void:
 	if selected_unit == null or not is_instance_valid(selected_unit):
 		unit_name_label.text = "(未選取)"
 		faction_label.text = ""
-		stats_label.text = "點擊己方部隊以查看數據。"
+		stats_label.text = "點擊己方部隊以查看數據;點擊敵軍可檢視其資訊。"
 		terrain_label.text = ""
 		return
-	var u := selected_unit
+	_render_unit_info(selected_unit)
+
+# Fills the info panel for any unit (own or enemy) — read-only stats view.
+func _render_unit_info(u) -> void:
+	if u == null or not is_instance_valid(u):
+		return
 	var d := DataLoader.get_unit_def(u.type_id)
 	var mods := CombatModifiers.for_unit(u, DataLoader.get_general_def(u.general_id))
 	unit_name_label.text = u.display_name
