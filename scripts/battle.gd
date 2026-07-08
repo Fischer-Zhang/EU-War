@@ -261,6 +261,7 @@ func _on_end_turn_pressed() -> void:
 
 func _run_ai_turn(faction_id: String) -> void:
 	var ai := AIController.new(_ai_difficulty_for(faction_id))
+	ai.begin_turn(faction_id, _living_units(), hex_map, factions, scenario)
 	var ai_units := _living_units_of(faction_id)
 	ai_units.sort_custom(func(a, b): return a.coord.y * 10000 + a.coord.x < b.coord.y * 10000 + b.coord.x)
 	for u in ai_units:

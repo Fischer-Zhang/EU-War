@@ -59,6 +59,15 @@ var general_id: String = ""
 var active_effects: Array = []
 var skill_cooldowns: Dictionary = {}   # skill_id -> turns remaining
 
+# The unit's authoritative drawn home: the exact pixel centre of its logical hex,
+# updated whenever it is placed or finishes a move. Cosmetic animations (the
+# attack lunge) always spring from and return to home_pos, never the live
+# position — so an overlapping tween (e.g. a brace counter-lunge still running
+# when the unit's own attack begins) can never strand the node off its hex.
+var home_pos: Vector2 = Vector2.ZERO
+var _home_set: bool = false
+var _anim_tween: Tween = null
+
 signal moved(new_coord: Vector2i)
 signal ranked_up(new_rank: int)
 
@@ -109,11 +118,26 @@ func reset_for_new_turn() -> void:
 func skill_ready(skill_id: String) -> bool:
 	return int(skill_cooldowns.get(skill_id, 0)) <= 0
 
+# Record the exact hex-centre this unit is drawn on. Callers that place or move
+# the unit to a hex centre must call this so lunge animations spring from truth.
+func set_home(world_pos: Vector2) -> void:
+	home_pos = world_pos
+	_home_set = true
+
+# A single owned tween per unit: killing any prior one before starting a new
+# one stops two animations from fighting over `position`.
+func _fresh_tween() -> Tween:
+	if _anim_tween != null and _anim_tween.is_valid():
+		_anim_tween.kill()
+	_anim_tween = create_tween()
+	return _anim_tween
+
 func move_to(new_coord: Vector2i, world_pos: Vector2, duration: float = 0.0) -> void:
 	coord = new_coord
 	has_moved = true
+	set_home(world_pos)
 	if duration > 0.0:
-		var tween := create_tween()
+		var tween := _fresh_tween()
 		tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		tween.tween_property(self, "position", world_pos, duration)
 	else:
@@ -197,12 +221,16 @@ func play_death_animation() -> void:
 	tween.tween_callback(queue_free)
 
 func play_attack_animation(target_world_pos: Vector2) -> void:
-	var start_pos := position
-	var direction := (target_world_pos - position)
+	# Spring from and return to the logical hex centre, not the live position, so
+	# the node always settles exactly on its hex even if a prior lunge tween is
+	# still mid-flight when this one starts.
+	var start_pos := home_pos if _home_set else position
+	var direction := (target_world_pos - start_pos)
 	if direction.length() < 0.001:
 		return
-	var lunge_pos := position + direction.normalized() * 14.0
-	var tween := create_tween()
+	position = start_pos
+	var lunge_pos := start_pos + direction.normalized() * 14.0
+	var tween := _fresh_tween()
 	tween.tween_property(self, "position", lunge_pos, 0.10).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "position", start_pos, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 

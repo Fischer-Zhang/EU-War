@@ -7,9 +7,13 @@ extends SceneTree
 #   * leaves every living unit on a unique hex, drawn exactly on its coord
 #     (stress test for the occupancy + move-sync invariants under full AI play).
 # It also prints a win/margin line per battle so the same run doubles as a
-# balance/AI-strength report. NOTE: outcomes are dominated by scenario/side
-# balance, not difficulty — this gate deliberately does NOT assert a difficulty
-# ordering (self-play shows the weight ladder is not monotonic).
+# balance/AI-strength report. NOTE: on the historical scenarios outcomes are
+# dominated by scenario/side balance, so this gate does NOT assert an ordering
+# there. It DOES assert monotonicity on the near-symmetric sandbox mirror (both
+# side assignments), where side balance cancels out: with the objective /
+# lookahead / coordination AI, a stronger difficulty must out-survive a weaker
+# one there. (Before that work the ladder was non-monotonic — hard overextended
+# and lost to easy even on the symmetric map.)
 
 const CAP := 50
 
@@ -98,7 +102,29 @@ func _run() -> void:
 	var poltava = await _play("09_poltava_1709", {"russia": "hard", "sweden": "hard"})
 	ok(poltava.alive.get("russia", 0) > 0, "defensive Russian redoubts hold at Poltava")
 
-	print("ran %d self-play battles" % (battles + 2))
+	# Difficulty-ladder monotonicity on the symmetric sandbox. Play each pairing
+	# on BOTH side assignments and sum survivors per difficulty so map/side bias
+	# cancels: the stronger difficulty must field more survivors across the mirror.
+	var extra := 0
+	for pair in [["hard", "easy"], ["hard", "normal"], ["normal", "easy"]]:
+		var strong: String = pair[0]
+		var weak: String = pair[1]
+		var a = await _play("10_sandbox", {"blue": strong, "red": weak})
+		var b = await _play("10_sandbox", {"blue": weak, "red": strong})
+		extra += 2
+		var strong_survivors: int = int(a.alive.get("blue", 0)) + int(b.alive.get("red", 0))
+		var weak_survivors: int = int(a.alive.get("red", 0)) + int(b.alive.get("blue", 0))
+		print("  sandbox mirror | %s=%d vs %s=%d" % [strong, strong_survivors, weak, weak_survivors])
+		# hard>easy must be strict (the headline claim); adjacent rungs need only
+		# not invert (a tie between adjacent difficulties on a symmetric map is ok).
+		if strong == "hard" and weak == "easy":
+			ok(strong_survivors > weak_survivors,
+				"sandbox: hard out-survives easy across the mirror (%d>%d)" % [strong_survivors, weak_survivors])
+		else:
+			ok(strong_survivors >= weak_survivors,
+				"sandbox: %s not worse than %s across the mirror (%d>=%d)" % [strong, weak, strong_survivors, weak_survivors])
+
+	print("ran %d self-play battles" % (battles + 2 + extra))
 	if fails == 0:
 		print("test_selfplay: ok")
 		quit(0)

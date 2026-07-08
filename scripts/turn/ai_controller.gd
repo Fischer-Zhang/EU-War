@@ -17,9 +17,17 @@ const CombatRules := preload("res://scripts/combat/combat_rules.gd")
 const CombatResolver := preload("res://scripts/combat/combat_resolver.gd")
 const CombatModifiers := preload("res://scripts/combat/combat_modifiers.gd")
 const CombatEffects := preload("res://scripts/combat/combat_effects.gd")
+const VictoryChecker := preload("res://scripts/scenario/victory_checker.gd")
 
 var difficulty: String = "normal"
 var weights: Dictionary = {}
+
+# Per-turn shared state, seeded by begin_turn(). This is what lifts the AI from
+# per-unit greed to faction-level play: objective hexes to seize/deny, and a
+# read on whether we're ahead (press to finish) or behind (husband force).
+var _obj_attack: Array = []      # hexes THIS faction must take/hold to win
+var _obj_defend: Array = []      # hexes we must deny the enemy (their goals)
+var _pressing: bool = false      # own living count > enemy living count
 
 # An order the battle executes: move along `path` (start..dest), then act.
 class Order:
@@ -33,17 +41,84 @@ func _init(_difficulty: String = "normal") -> void:
 	difficulty = _difficulty
 	weights = _weights_for(difficulty)
 
+# Seed faction-level context once per turn, before planning any unit. Derives the
+# hexes this faction must seize (its own capture/control goals) and the hexes it
+# must deny (each enemy's capture/control goals), and whether it currently
+# out-numbers the enemy (press to finish vs. conserve). plan_unit reads this.
+func begin_turn(faction: String, units: Array, _hex_map, factions: Dictionary, scenario: Dictionary) -> void:
+	_obj_attack = []
+	_obj_defend = []
+	var victory: Dictionary = scenario.get("victory", {})
+	for fid in victory.keys():
+		var goals := _goal_hexes(victory.get(fid, {}))
+		if String(fid) == faction:
+			_obj_attack.append_array(goals)
+		elif factions.has(fid) or String(fid) != faction:
+			# Another faction's capture/control goals are hexes we defend.
+			_obj_defend.append_array(goals)
+	var own := 0
+	var enemy := 0
+	for u in units:
+		if not u.is_alive():
+			continue
+		if u.faction_id == faction:
+			own += 1
+		else:
+			enemy += 1
+	_pressing = own > enemy
+
+# Goal hexes for one faction's victory condition (empty for eliminate/survive).
+static func _goal_hexes(cond: Dictionary) -> Array:
+	var out: Array = []
+	match String(cond.get("type", "eliminate")):
+		"capture":
+			out.append(VictoryChecker.coord_from_array(cond.get("target", [0, 0])))
+		"control_count":
+			for t in cond.get("targets", []):
+				out.append(VictoryChecker.coord_from_array(t))
+	return out
+
+static func _nearest_hex_distance(from: Vector2i, hexes: Array) -> int:
+	var best := -1
+	for h in hexes:
+		var d := HexCoord.distance(from, h)
+		if best < 0 or d < best:
+			best = d
+	return best
+
+# Rough worth of a unit: cost dominates, veterancy and remaining HP add to it.
+# Used to price trades — losing a 4-cost knight to kill a 2-cost archer is bad.
+static func _unit_value(unit, unit_def: Dictionary) -> float:
+	return float(int(unit_def.get("cost", 1))) * 4.0 + float(unit.rank) * 3.0 \
+		+ float(unit.hp) / float(max(1, unit.max_hp)) * 3.0
+
+func _friendly_adjacent(cand: Vector2i, unit, units: Array, faction: String) -> int:
+	var n := 0
+	for u in units:
+		if u == unit or u.faction_id != faction or not u.is_alive():
+			continue
+		if HexCoord.distance(cand, u.coord) == 1:
+			n += 1
+	return n
+
 static func _weights_for(d: String) -> Dictionary:
+	# "objective" drives pursuit of scenario goal hexes; "trade" is how hard the AI
+	# refuses a kill that costs a unit worth more than it takes (higher = fewer
+	# suicidal dives). Both scale the coordination/lookahead terms, not the base
+	# combat math, so the ladder stays a smooth ramp.
 	match d:
 		"easy":
 			return {"aggression": 0.6, "counter_risk": 1.4, "preservation": 0.4,
-				"kill_bonus": 8.0, "advance": 0.6, "misplay": true, "retreat": false}
+				"kill_bonus": 8.0, "advance": 0.6, "objective": 0.3, "trade": 0.3,
+				"support": 0.3, "misplay": true, "retreat": false}
 		"hard":
 			return {"aggression": 1.4, "counter_risk": 0.7, "preservation": 1.3,
-				"kill_bonus": 16.0, "advance": 1.2, "misplay": false, "retreat": true}
+				"kill_bonus": 16.0, "advance": 1.2, "objective": 1.6, "trade": 1.4,
+				"support": 1.3, "misplay": false, "retreat": true}
 		_:
 			return {"aggression": 1.0, "counter_risk": 1.0, "preservation": 1.0,
-				"kill_bonus": 12.0, "advance": 1.0, "misplay": false, "retreat": true}
+				"kill_bonus": 12.0, "advance": 1.0, "objective": 1.0, "trade": 1.0,
+				"support": 1.0, "misplay": false, "retreat": true}
 
 func plan_unit(unit, units: Array, hex_map, factions: Dictionary) -> Order:
 	var order := Order.new()
@@ -134,18 +209,53 @@ func _score_destination(unit, cand: Vector2i, unit_def: Dictionary, general_def:
 
 	# Exposure NUDGES positioning (prefer the safer of two attacking hexes, or
 	# hang back when wounded/veteran/defensive) — it can't veto a good attack.
-	var exposure: float = min(_exposure_at(cand, unit, unit_def, atk_mods, units, hex_map, visible, faction),
-		float(unit.hp) * 1.5)
+	var raw_exposure := _exposure_at(cand, unit, unit_def, atk_mods, units, hex_map, visible, faction)
+	var exposure: float = min(raw_exposure, float(unit.hp) * 1.5)
 	var preserve: float = float(weights["preservation"]) * _preservation_scale(unit)
 	score -= exposure * 0.25 * float(weights["counter_risk"]) * preserve * float(pmods["exposure"])
 
+	# Shallow lookahead / trade quality: if the enemy could plausibly KILL this
+	# unit here next turn (summed incoming >= its HP), price the trade. Diving to
+	# kill something worth less than yourself is a loss; hard refuses it, easy
+	# barely notices. This is the term that stops the aggressive ladder from
+	# feeding its own units in piecemeal and losing the attrition war.
+	if raw_exposure >= float(unit.hp):
+		var loss := _unit_value(unit, unit_def)
+		# Weight the payoff heavily: dying to score a kill (kill_bonus is baked into
+		# best_attack_score) is a fair trade; dying merely to chip is not. Only the
+		# latter is penalised, so units still grind when they can survive the reply.
+		var net := loss - best_attack_score * 1.5
+		if net > 0.0:
+			score -= net * float(weights["trade"]) * float(pmods["exposure"]) * 0.6
+
+	# Coordination: fighting alongside neighbours is safer and concentrates force;
+	# a lone thrust deep into the enemy is discouraged (and, above, more lethal).
+	score += float(_friendly_adjacent(cand, unit, units, faction)) * float(weights["support"])
+
+	# Objective pressure. When not already striking, pull toward hexes we must
+	# take; always bias toward hexes we must deny the enemy (garrison them).
+	if best_target == null and not _obj_attack.is_empty():
+		var od := _nearest_hex_distance(cand, _obj_attack)
+		if od >= 0:
+			score -= float(od) * float(weights["objective"])
+			if od == 0:
+				score += 6.0 * float(weights["objective"])
+	if not _obj_defend.is_empty():
+		var dd := _nearest_hex_distance(cand, _obj_defend)
+		if dd >= 0:
+			score -= float(dd) * float(weights["objective"]) * 0.4
+			if dd <= 1:
+				score += float(int(terrain_def.get("defense", 0))) * 1.5
+
 	# Advance toward the enemy ONLY when this hex can't yet strike. Once in range,
 	# positioning is driven by attack value and exposure, not raw closing — this
-	# stops ranged units and defenders from walking into melee for no gain.
+	# stops ranged units and defenders from walking into melee for no gain. When
+	# we out-number the enemy we close harder to finish the fight (fewer stalls).
 	if best_target == null:
 		var nearest := _nearest_enemy_distance(cand, units, faction)
 		if nearest >= 0:
-			score -= float(nearest) * float(weights["advance"]) * float(pmods["advance"])
+			var press := 1.4 if _pressing else 1.0
+			score -= float(nearest) * float(weights["advance"]) * float(pmods["advance"]) * press
 
 	var action := "attack" if best_target != null else "wait"
 	# No target, sitting in cover under threat → dig in rather than idle.
