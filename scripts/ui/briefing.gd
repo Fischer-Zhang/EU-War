@@ -67,8 +67,8 @@ func _compose(scenario: Dictionary) -> String:
 	return "\n".join(lines)
 
 func _on_start_pressed() -> void:
-	GameState.start_scenario(GameState.current_scenario_id)
-	get_tree().change_scene_to_file("res://scenes/battle.tscn")
+	# Route through the deployment screen (assign generals) before the battle.
+	get_tree().change_scene_to_file("res://scenes/deployment.tscn")
 
 func _on_back_pressed() -> void:
 	if GameState.in_conquest():

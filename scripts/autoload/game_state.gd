@@ -28,6 +28,39 @@ func start_scenario(id: String) -> void:
 	current_scenario_id = id
 	scenario_started.emit(id)
 
+# ------------------------------------------------------------------ deployment / generals
+
+# General assignments chosen on the deployment screen: unit key -> general_id.
+# The key is "<type>#<ordinal>" over the player faction's units in scenario
+# order, so deployment and battle.gd agree without threading unit identity.
+var deploy_generals: Dictionary = {}
+
+func clear_deploy_generals() -> void:
+	deploy_generals = {}
+
+# Ordered player-faction units of a (resolved) scenario, each with a stable key.
+func player_units_in(scenario: Dictionary) -> Array:
+	var pf := ""
+	for f in scenario.get("factions", []):
+		if String(f.get("controller", "")) == "player":
+			pf = String(f.get("id", ""))
+			break
+	var out: Array = []
+	var counts := {}
+	for u in scenario.get("units", []):
+		if String(u.get("faction", "")) != pf:
+			continue
+		var t := String(u.get("type", ""))
+		var n := int(counts.get(t, 0))
+		counts[t] = n + 1
+		out.append({
+			"key": "%s#%d" % [t, n],
+			"type": t,
+			"name": String(u.get("name", "")),
+			"general": String(u.get("general", "")),
+		})
+	return out
+
 func end_scenario(winner: String, summary: Dictionary) -> void:
 	last_result = {"winner": winner, "summary": summary}
 	scenario_ended.emit(winner, summary)

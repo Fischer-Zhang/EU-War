@@ -8,6 +8,7 @@ const SCENES := [
 	"res://scenes/main_menu.tscn",
 	"res://scenes/scenario_select.tscn",
 	"res://scenes/briefing.tscn",
+	"res://scenes/deployment.tscn",
 	"res://scenes/battle.tscn",
 ]
 

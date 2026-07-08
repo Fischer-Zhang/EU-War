@@ -124,6 +124,7 @@ func _setup_scenario() -> void:
 			break
 	if player_faction == "":
 		player_faction = factions.keys()[0]
+	_apply_deploy_generals()
 	_apply_tech_bonuses()
 	_apply_conquest_bonuses()
 	# Objective marker from a capture victory condition.
@@ -878,6 +879,22 @@ func _apply_tech_bonuses() -> void:
 				break
 		if any:
 			u.active_effects.append({"self_mods": mods})
+
+# Apply generals chosen on the deployment screen. Keys match GameState.
+# player_units_in ordering: the n-th player unit of each type in build order.
+func _apply_deploy_generals() -> void:
+	if GameState.deploy_generals.is_empty():
+		return
+	var counts := {}
+	for u in units:
+		if u.faction_id != player_faction:
+			continue
+		var n := int(counts.get(u.type_id, 0))
+		counts[u.type_id] = n + 1
+		var key := "%s#%d" % [u.type_id, n]
+		var gid := String(GameState.deploy_generals.get(key, ""))
+		if gid != "":
+			u.general_id = gid
 
 # Conquest economy bonuses: a global army level adds attack to all player units;
 # fortifying a territory entrenches your units when you defend it.
