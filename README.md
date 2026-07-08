@@ -70,7 +70,7 @@ damage = max(1, round(base * attacker_hp / attacker_max_hp))
 - **歷史將領**:對特定兵種提供加成(如黑太子強化長弓與下馬騎士、孔代親王強化騎兵衝鋒)。
 - 間接火力(野砲/臼砲)無視視線遮擋;臼砲有濺射傷害。
 
-**AI**:決定性評分 AI,對每個可行動單位評估移動落點——落地攻擊價值(擊殺高權重)為主導,曝險只微調走位,並以推進權重逼近接戰。難度為權重階梯(進取、反擊迴避、部隊保存、推進與簡單難度的走位失誤預算),困難最積極、簡單最保守。
+**AI**:決定性評分 AI,對每個可行動單位評估移動落點——落地攻擊價值(擊殺高權重)為主導,曝險微調走位。推進權重只在「該落點尚無法攻擊」時生效(已進入射程就不再盲目逼近),遠程單位(射程 ≥2)偏好從最大射程開火而非貼臉。每個陣營可設 `posture`(`balanced`/`defensive`/`aggressive`)——防守傾向重視掩蔽、避免曝險、固守不躁進。難度為權重階梯(進取、反擊迴避、部隊保存、推進與簡單難度的走位失誤預算),困難最積極、簡單最保守。
 
 ## 操作
 
@@ -125,9 +125,10 @@ tools/validate.sh        # 上述 + 全部無頭 GDScript 測試
 1. 複製 `data/scenarios/` 中的一個 JSON。
 2. 修改 `id`、`title`、`era`、`briefing`、`map`、`factions`、`units`、`victory`。
 3. 座標使用 odd-r 偏移 `[col, row]`,執行期轉為軸向六角座標。
-4. (可選)加入 `deployment` 讓玩家在開戰前排陣:`"deployment": { "blue": { "cols": [0, 4], "rows": [0, 9] } }` —— 指定該陣營可部署的 odd-r 矩形範圍(含端點),戰鬥開始前玩家可在區內移動或互換己方部隊。省略則無部署階段。
-5. (可選)`tutorial` 提供分步教學提示:字串或 `{ "text": "...", "advance_on": "move" }`,`advance_on` 可為單一動作或陣列(`select`/`move`/`attack_ranged`/`attack_melee`/`entrench`/`brace`/`rally`)。
-6. 執行 `tools/validate_fast.sh`;劇本會自動出現在單次作戰列表。
+4. (可選)在 `factions[]` 加 `"posture"` 調整該陣營的 AI 傾向:`"balanced"`(預設)、`"defensive"`(重視掩蔽、避免曝險、固守不躁進——適合防守方)、`"aggressive"`(積極推進)。
+5. (可選)加入 `deployment` 讓玩家在開戰前排陣:`"deployment": { "blue": { "cols": [0, 4], "rows": [0, 9] } }` —— 指定該陣營可部署的 odd-r 矩形範圍(含端點),戰鬥開始前玩家可在區內移動或互換己方部隊。省略則無部署階段。
+6. (可選)`tutorial` 提供分步教學提示:字串或 `{ "text": "...", "advance_on": "move" }`,`advance_on` 可為單一動作或陣列(`select`/`move`/`attack_ranged`/`attack_melee`/`entrench`/`brace`/`rally`)。
+7. 執行 `tools/validate_fast.sh`;劇本會自動出現在單次作戰列表。
 
 ## 路線圖
 

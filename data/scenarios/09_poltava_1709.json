@@ -286,7 +286,8 @@
       "id": "russia",
       "name": "俄羅斯",
       "controller": "player",
-      "color": "#3a7d44"
+      "color": "#3a7d44",
+      "posture": "defensive"
     },
     {
       "id": "sweden",

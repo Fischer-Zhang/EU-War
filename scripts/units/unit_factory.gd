@@ -20,6 +20,7 @@ static func build(scenario: Dictionary, _hex_map: HexMap) -> Dictionary:
 			"controller": String(f.get("controller", "ai")),
 			"color": Color(String(f.get("color", "#cccccc"))),
 			"ai": String(f.get("ai", "")),
+			"posture": String(f.get("posture", "balanced")),
 		}
 
 	var units: Array = []

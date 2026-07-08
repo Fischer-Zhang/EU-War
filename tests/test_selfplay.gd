@@ -90,7 +90,15 @@ func _run() -> void:
 			print("  %s | %s=%s %s=%s -> %-8s alive=%s t=%d" % [
 				sid, fids[0], combo[0], fids[1], combo[1], win, r.alive, r.turns])
 
-	print("ran %d self-play battles" % battles)
+	# Defensive-behavior guard: a competent defender with a posture and ranged
+	# stand-off must HOLD, not charge out and get wiped (before this fix,
+	# AI-england was dead by turn ~5 at Crécy; now it survives).
+	var crecy = await _play("02_crecy_1346", {"england": "hard", "france": "easy"})
+	ok(crecy.alive.get("england", 0) > 0, "defensive longbows hold at Crécy (not wiped)")
+	var poltava = await _play("09_poltava_1709", {"russia": "hard", "sweden": "hard"})
+	ok(poltava.alive.get("russia", 0) > 0, "defensive Russian redoubts hold at Poltava")
+
+	print("ran %d self-play battles" % (battles + 2))
 	if fails == 0:
 		print("test_selfplay: ok")
 		quit(0)

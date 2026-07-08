@@ -307,7 +307,8 @@
       "name": "法—巴伐利亞",
       "controller": "ai",
       "ai": "defensive",
-      "color": "#3b5ac2"
+      "color": "#3b5ac2",
+      "posture": "defensive"
     }
   ],
   "units": [

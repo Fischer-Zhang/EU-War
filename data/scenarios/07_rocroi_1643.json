@@ -319,7 +319,8 @@
       "name": "西班牙帝國軍",
       "controller": "ai",
       "ai": "hard",
-      "color": "#b0402f"
+      "color": "#b0402f",
+      "posture": "defensive"
     }
   ],
   "units": [

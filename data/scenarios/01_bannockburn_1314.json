@@ -286,7 +286,8 @@
       "id": "scotland",
       "name": "蘇格蘭",
       "controller": "player",
-      "color": "#2f6fb0"
+      "color": "#2f6fb0",
+      "posture": "defensive"
     },
     {
       "id": "england",

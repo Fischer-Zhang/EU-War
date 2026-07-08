@@ -57,6 +57,7 @@ func plan_unit(unit, units: Array, hex_map, factions: Dictionary) -> Order:
 	var general_def: Dictionary = DataLoader.get_general_def(unit.general_id)
 	var visible: Dictionary = Visibility.compute_visible_hexes(units, faction, hex_map, DataLoader.units)
 
+	var pmods := _posture_mods(String(factions.get(faction, {}).get("posture", "balanced")))
 	var occupied := _occupancy(units)
 	var mp: int = unit.effective_move(unit_def, general_def)
 	var reach: Dictionary = Pathfinding.movement_range(
@@ -71,7 +72,7 @@ func plan_unit(unit, units: Array, hex_map, factions: Dictionary) -> Order:
 	var best_score := -INF
 	var best: Order = order
 	for cand in candidates:
-		var eval := _score_destination(unit, cand, unit_def, general_def, units, hex_map, visible, faction)
+		var eval := _score_destination(unit, cand, unit_def, general_def, units, hex_map, visible, faction, pmods)
 		var score: float = eval["score"]
 		if score > best_score:
 			best_score = score
@@ -91,13 +92,23 @@ func plan_unit(unit, units: Array, hex_map, factions: Dictionary) -> Order:
 			best.action = "wait"
 	return best
 
+# Per-faction posture multipliers on cover / exposure-aversion / advance drive.
+static func _posture_mods(posture: String) -> Dictionary:
+	match posture:
+		"defensive":
+			return {"cover": 2.5, "exposure": 1.8, "advance": 0.2}
+		"aggressive":
+			return {"cover": 0.8, "exposure": 0.6, "advance": 1.3}
+		_:
+			return {"cover": 1.0, "exposure": 1.0, "advance": 1.0}
+
 func _score_destination(unit, cand: Vector2i, unit_def: Dictionary, general_def: Dictionary,
-		units: Array, hex_map, visible: Dictionary, faction: String) -> Dictionary:
+		units: Array, hex_map, visible: Dictionary, faction: String, pmods: Dictionary) -> Dictionary:
 	var atk_mods: Dictionary = CombatModifiers.for_unit(unit, general_def)
 	var terrain_def: Dictionary = _terrain_def(hex_map, cand)
 	var score := 0.0
-	# Cover value at the destination.
-	score += float(int(terrain_def.get("defense", 0)))
+	# Cover value at the destination (defenders value it more).
+	score += float(int(terrain_def.get("defense", 0))) * float(pmods["cover"])
 
 	# Best attack available from this hex. Landing a hit is the PRIMARY driver:
 	# it must outweigh the incidental exposure of stepping into reach, or the AI
@@ -116,18 +127,25 @@ func _score_destination(unit, cand: Vector2i, unit_def: Dictionary, general_def:
 			best_target = u
 	score += best_attack_score * 2.0 * float(weights["aggression"])
 
-	# Exposure only NUDGES positioning (prefer the safer of two attacking hexes,
-	# or hang back a little when wounded/veteran) — it can't veto a good attack.
+	# Ranged stand-off: a unit that can strike at distance prefers to fire from
+	# as far as its range allows, rather than closing into melee/counter reach.
+	if best_target != null and int(unit_def.get("range", 1)) >= 2:
+		score += float(HexCoord.distance(cand, best_target.coord)) * 1.5
+
+	# Exposure NUDGES positioning (prefer the safer of two attacking hexes, or
+	# hang back when wounded/veteran/defensive) — it can't veto a good attack.
 	var exposure: float = min(_exposure_at(cand, unit, unit_def, atk_mods, units, hex_map, visible, faction),
 		float(unit.hp) * 1.5)
 	var preserve: float = float(weights["preservation"]) * _preservation_scale(unit)
-	score -= exposure * 0.25 * float(weights["counter_risk"]) * preserve
+	score -= exposure * 0.25 * float(weights["counter_risk"]) * preserve * float(pmods["exposure"])
 
-	# Advance toward the nearest enemy — strong enough to force contact when no
-	# attack is yet in reach.
-	var nearest := _nearest_enemy_distance(cand, units, faction)
-	if nearest >= 0:
-		score -= float(nearest) * float(weights["advance"])
+	# Advance toward the enemy ONLY when this hex can't yet strike. Once in range,
+	# positioning is driven by attack value and exposure, not raw closing — this
+	# stops ranged units and defenders from walking into melee for no gain.
+	if best_target == null:
+		var nearest := _nearest_enemy_distance(cand, units, faction)
+		if nearest >= 0:
+			score -= float(nearest) * float(weights["advance"]) * float(pmods["advance"])
 
 	var action := "attack" if best_target != null else "wait"
 	# No target, sitting in cover under threat → dig in rather than idle.

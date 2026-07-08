@@ -254,7 +254,8 @@
       "id": "england",
       "name": "英格蘭",
       "controller": "player",
-      "color": "#c23b3b"
+      "color": "#c23b3b",
+      "posture": "defensive"
     },
     {
       "id": "france",
