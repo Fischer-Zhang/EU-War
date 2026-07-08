@@ -42,6 +42,16 @@ func _run() -> void:
 	ok(not gs.territory_attackable("lowlands"), "deep enemy territory not attackable")
 	ok(not gs.begin_conquest_attack("lowlands"), "attacking a non-frontline territory refused")
 
+	# Backing out of a set-up attack (briefing "back") abandons the battle but
+	# keeps the campaign — ownership unchanged, no counter queued, still attackable.
+	ok(gs.begin_conquest_attack("normandy"), "begin attack (to cancel)")
+	gs.cancel_conquest_battle()
+	ok(gs.conquest_battle.is_empty(), "cancel clears the pending battle")
+	ok(gs.in_conquest(), "cancel keeps the conquest campaign")
+	ok(gs.conquest_owner.get("normandy", "") == "enemy", "cancelled attack leaves ownership unchanged")
+	ok(not gs.has_enemy_counter(), "cancelled attack queues no counter")
+	ok(gs.territory_attackable("normandy"), "normandy still attackable after cancel")
+
 	# Attack normandy and win -> captured, and the enemy queues a counter.
 	ok(gs.begin_conquest_attack("normandy"), "begin attack on normandy")
 	ok(gs.current_scenario_id == "02_crecy_1346", "battle scenario = territory's scenario")

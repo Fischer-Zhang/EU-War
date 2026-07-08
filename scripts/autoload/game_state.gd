@@ -322,6 +322,12 @@ func begin_conquest_defense() -> bool:
 	current_scenario_id = String(conquest_territory(conquest_enemy_target).get("scenario", ""))
 	return true
 
+# Back out of a battle that was set up but not fought (e.g. the player pressed
+# "back" on the briefing). Drops the pending battle only; a queued enemy counter
+# (conquest_enemy_target) stays queued, so a defence can't be dodged permanently.
+func cancel_conquest_battle() -> void:
+	conquest_battle = {}
+
 # Apply a finished battle to the strategic map and advance the turn.
 func resolve_conquest_battle(player_won: bool) -> void:
 	var tid := String(conquest_battle.get("territory", ""))

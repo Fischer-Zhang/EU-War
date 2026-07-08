@@ -67,7 +67,7 @@ func _on_start_pressed() -> void:
 
 func _on_back_pressed() -> void:
 	if GameState.in_conquest():
-		GameState.conquest_target = ""   # cancel this attack, keep the campaign
+		GameState.cancel_conquest_battle()   # abandon this battle, keep the campaign
 		get_tree().change_scene_to_file("res://scenes/conquest_map.tscn")
 		return
 	if GameState.in_campaign():
