@@ -21,10 +21,14 @@ jobs:
   build:
     name: Export web build
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       GODOT_VERSION: "4.2.2"
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
       - name: Install Godot ${{ env.GODOT_VERSION }} + export templates
         run: |
@@ -43,6 +47,9 @@ jobs:
       - name: Import resources
         run: godot --headless --path . --import
 
+      - name: Run full validation
+        run: tools/validate.sh
+
       - name: Export Web build
         run: |
           set -euo pipefail
@@ -60,6 +67,7 @@ jobs:
   deploy:
     name: Deploy to Pages
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: build
     environment:
       name: github-pages

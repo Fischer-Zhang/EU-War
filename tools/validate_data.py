@@ -3,7 +3,8 @@
 
 Checks JSON parses, scenario references resolve against the catalogs, maps are
 rectangular, unit placements are on-map and passable with no duplicate hexes,
-victory targets are in-bounds, and commander applies_to lists are valid.
+victory conditions match the engine contract, conquest maps are coherent, and
+commander applies_to lists are valid.
 Exits non-zero on any error.
 """
 import json
@@ -21,6 +22,32 @@ def load(path):
 
 def offset_to_axial(col, row):
     return (col - (row >> 1), row)
+
+
+def coord_pair(value):
+    if not isinstance(value, list) or len(value) < 2:
+        return None
+    if not isinstance(value[0], int) or not isinstance(value[1], int):
+        return None
+    return (value[0], value[1])
+
+
+def coord_in_bounds(coord, width, height):
+    if coord is None:
+        return False
+    col, row = coord
+    return 0 <= row < (height or 0) and 0 <= col < (width or 0)
+
+
+def tile_at(rows, coord):
+    if coord is None:
+        return None
+    col, row = coord
+    if row < 0 or row >= len(rows):
+        return None
+    if col < 0 or col >= len(rows[row]):
+        return None
+    return rows[row][col]
 
 
 def main():
@@ -50,6 +77,21 @@ def main():
     if len(scenario_files) < 5:
         errors.append(f"expected >= 5 scenarios, found {len(scenario_files)}")
 
+    scenario_entries = []
+    scenario_id_counts = {}
+    for fn in scenario_files:
+        s = load(os.path.join(scen_dir, fn))
+        sid = s.get("id", "")
+        scenario_entries.append((fn, sid, s))
+        if not isinstance(sid, str) or sid == "":
+            errors.append(f"{fn}: missing/invalid scenario id")
+            continue
+        scenario_id_counts[sid] = scenario_id_counts.get(sid, 0) + 1
+    for sid, count in scenario_id_counts.items():
+        if count > 1:
+            errors.append(f"duplicate scenario id '{sid}' appears {count} times")
+    scenario_ids = set(scenario_id_counts.keys())
+
     # Tech tree (optional): prerequisites and applies_to must resolve.
     techs_path = os.path.join(DATA, "techs.json")
     techs = load(techs_path) if os.path.exists(techs_path) else {}
@@ -72,7 +114,6 @@ def main():
             if k not in valid_mod_keys:
                 errors.append(f"tech {tid}: unknown mod key '{k}'")
 
-    scenario_ids = {load(os.path.join(scen_dir, fn)).get("id") for fn in scenario_files}
     campaigns_path = os.path.join(DATA, "campaigns.json")
     campaigns = load(campaigns_path) if os.path.exists(campaigns_path) else {}
     for cid, c in campaigns.items():
@@ -88,24 +129,53 @@ def main():
     conquests = load(conquest_path) if os.path.exists(conquest_path) else {}
     for qid, q in conquests.items():
         terrs = q.get("territories", [])
-        ids = {t.get("id") for t in terrs}
+        id_counts = {}
+        for t in terrs:
+            tid = t.get("id", "")
+            if not isinstance(tid, str) or tid == "":
+                errors.append(f"conquest {qid}: territory missing/invalid id")
+                continue
+            id_counts[tid] = id_counts.get(tid, 0) + 1
+        for tid, count in id_counts.items():
+            if count > 1:
+                errors.append(f"conquest {qid}: duplicate territory id '{tid}'")
+        ids = set(id_counts.keys())
+        terr_by_id = {t.get("id"): t for t in terrs if t.get("id") in ids}
+        neighbors_by_id = {tid: set() for tid in ids}
         if not any(t.get("owner") == "player" for t in terrs):
             errors.append(f"conquest {qid}: no player-owned starting territory")
         if not any(t.get("owner") == "enemy" for t in terrs):
             errors.append(f"conquest {qid}: no enemy territory to conquer")
         for t in terrs:
+            tid = t.get("id")
             sid = t.get("scenario", "")
             if sid and sid not in scenario_ids:
-                errors.append(f"conquest {qid}: territory '{t.get('id')}' unknown scenario '{sid}'")
+                errors.append(f"conquest {qid}: territory '{tid}' unknown scenario '{sid}'")
             if t.get("owner") == "enemy" and not sid:
-                errors.append(f"conquest {qid}: enemy territory '{t.get('id')}' needs a scenario")
+                errors.append(f"conquest {qid}: enemy territory '{tid}' needs a scenario")
             for nb in t.get("links", []):
                 if nb not in ids:
-                    errors.append(f"conquest {qid}: territory '{t.get('id')}' links unknown '{nb}'")
+                    errors.append(f"conquest {qid}: territory '{tid}' links unknown '{nb}'")
+                elif tid in ids:
+                    neighbors_by_id[tid].add(nb)
+                    neighbors_by_id[nb].add(tid)
+        if ids:
+            start = next(iter(ids))
+            visited = {start}
+            stack = [start]
+            while stack:
+                cur = stack.pop()
+                for nb in neighbors_by_id.get(cur, set()):
+                    if nb not in visited:
+                        visited.add(nb)
+                        stack.append(nb)
+            if len(visited) != len(ids):
+                missing = sorted(ids - visited)
+                errors.append(f"conquest {qid}: disconnected territories {missing}")
 
-    for fn in scenario_files:
-        s = load(os.path.join(scen_dir, fn))
-        sid = s.get("id", fn)
+    victory_types = {"eliminate", "capture", "survive", "control_count"}
+    for fn, file_sid, s in scenario_entries:
+        sid = file_sid if isinstance(file_sid, str) and file_sid else fn
         m = s.get("map", {})
         rows = m.get("tiles", [])
         w, h = m.get("width"), m.get("height")
@@ -133,11 +203,15 @@ def main():
             gid = u.get("general", "")
             if gid and gid not in generals:
                 errors.append(f"{sid}: unknown commander '{gid}'")
-            col, row = u.get("at", [0, 0])
-            if not (0 <= row < (h or 0) and 0 <= col < (w or 0)):
+            coord = coord_pair(u.get("at", [0, 0]))
+            if not coord_in_bounds(coord, w, h):
                 errors.append(f"{sid}: unit '{u.get('name')}' off-map at {u.get('at')}")
                 continue
-            terr = rows[row][col]
+            col, row = coord
+            terr = tile_at(rows, coord)
+            if terr is None:
+                errors.append(f"{sid}: unit '{u.get('name')}' off-map at {u.get('at')}")
+                continue
             if terr in impassable:
                 errors.append(f"{sid}: unit '{u.get('name')}' on impassable {terr} at {u.get('at')}")
             key = (col, row)
@@ -153,11 +227,15 @@ def main():
                 errors.append(f"{sid}: reinforcement in unknown faction '{r.get('faction')}'")
             if not isinstance(r.get("at_turn"), int) or r.get("at_turn", 0) < 1:
                 errors.append(f"{sid}: reinforcement '{r.get('name')}' needs at_turn >= 1")
-            col, row = r.get("at", [0, 0])
-            if not (0 <= row < (h or 0) and 0 <= col < (w or 0)):
+            coord = coord_pair(r.get("at", [0, 0]))
+            if not coord_in_bounds(coord, w, h):
                 errors.append(f"{sid}: reinforcement '{r.get('name')}' off-map at {r.get('at')}")
-            elif rows[row][col] in impassable:
-                errors.append(f"{sid}: reinforcement '{r.get('name')}' on impassable {rows[row][col]}")
+            else:
+                terr = tile_at(rows, coord)
+                if terr is None:
+                    errors.append(f"{sid}: reinforcement '{r.get('name')}' off-map at {r.get('at')}")
+                elif terr in impassable:
+                    errors.append(f"{sid}: reinforcement '{r.get('name')}' on impassable {terr}")
 
         # Secondary objectives (optional).
         sec_types = {"no_losses", "by_turn", "hold_hex", "eliminate_type"}
@@ -170,8 +248,8 @@ def main():
             if ot == "eliminate_type" and o.get("unit_type") not in units:
                 errors.append(f"{sid}: eliminate_type objective '{o.get('id')}' unknown unit '{o.get('unit_type')}'")
             if ot == "hold_hex":
-                col, row = o.get("at", [0, 0])
-                if not (0 <= row < (h or 0) and 0 <= col < (w or 0)):
+                coord = coord_pair(o.get("at", [0, 0]))
+                if not coord_in_bounds(coord, w, h):
                     errors.append(f"{sid}: hold_hex objective '{o.get('id')}' off-map {o.get('at')}")
 
         # Deployment zones (optional): faction must exist, rect in bounds.
@@ -179,21 +257,59 @@ def main():
             if fid not in faction_ids:
                 errors.append(f"{sid}: deployment for unknown faction '{fid}'")
             cols = cfg.get("cols", [0, 0])
-            rows = cfg.get("rows", [0, 0])
-            if not (len(cols) == 2 and len(rows) == 2):
+            dep_rows = cfg.get("rows", [0, 0])
+            if not (len(cols) == 2 and len(dep_rows) == 2):
                 errors.append(f"{sid}: deployment {fid} needs 'cols' and 'rows' pairs")
                 continue
             if not (0 <= cols[0] <= cols[1] < (w or 0)):
                 errors.append(f"{sid}: deployment {fid} cols {cols} out of bounds")
-            if not (0 <= rows[0] <= rows[1] < (h or 0)):
-                errors.append(f"{sid}: deployment {fid} rows {rows} out of bounds")
+            if not (0 <= dep_rows[0] <= dep_rows[1] < (h or 0)):
+                errors.append(f"{sid}: deployment {fid} rows {dep_rows} out of bounds")
 
-        # Victory targets in bounds.
-        for fid, cond in s.get("victory", {}).items():
-            if cond.get("type") == "capture":
-                col, row = cond.get("target", [0, 0])
-                if not (0 <= row < (h or 0) and 0 <= col < (w or 0)):
+        # Victory conditions must match VictoryChecker's supported contract.
+        victory = s.get("victory", {})
+        if not isinstance(victory, dict) or not victory:
+            errors.append(f"{sid}: missing/invalid victory conditions")
+        for fid, cond in victory.items():
+            if fid not in faction_ids:
+                errors.append(f"{sid}: victory for unknown faction '{fid}'")
+            if not isinstance(cond, dict):
+                errors.append(f"{sid}: victory for {fid} must be an object")
+                continue
+            cond_type = cond.get("type", "eliminate")
+            if cond_type not in victory_types:
+                errors.append(f"{sid}: {fid} victory unknown type '{cond_type}'")
+                continue
+            if "by_turn" in cond and (not isinstance(cond.get("by_turn"), int) or cond.get("by_turn", 0) < 1):
+                errors.append(f"{sid}: {fid} victory by_turn must be >= 1")
+            if cond_type == "capture":
+                target = coord_pair(cond.get("target", []))
+                if not coord_in_bounds(target, w, h):
                     errors.append(f"{sid}: {fid} capture target off-map {cond.get('target')}")
+                else:
+                    terr = tile_at(rows, target)
+                    if terr is None:
+                        errors.append(f"{sid}: {fid} capture target off-map {cond.get('target')}")
+                    elif terr in impassable:
+                        errors.append(f"{sid}: {fid} capture target on impassable {terr}")
+            if cond_type == "control_count":
+                targets = cond.get("targets", [])
+                if not isinstance(targets, list) or not targets:
+                    errors.append(f"{sid}: {fid} control_count needs non-empty targets")
+                    targets = []
+                required = cond.get("required", len(targets))
+                if not isinstance(required, int) or required < 1 or required > len(targets):
+                    errors.append(f"{sid}: {fid} control_count required out of range")
+                for target_value in targets:
+                    target = coord_pair(target_value)
+                    if not coord_in_bounds(target, w, h):
+                        errors.append(f"{sid}: {fid} control target off-map {target_value}")
+                    else:
+                        terr = tile_at(rows, target)
+                        if terr is None:
+                            errors.append(f"{sid}: {fid} control target off-map {target_value}")
+                        elif terr in impassable:
+                            errors.append(f"{sid}: {fid} control target on impassable {terr}")
 
     if errors:
         print("DATA VALIDATION FAILED:")
