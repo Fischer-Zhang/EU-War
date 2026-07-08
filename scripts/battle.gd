@@ -18,6 +18,7 @@ const CombatEffects := preload("res://scripts/combat/combat_effects.gd")
 const CombatModifiers := preload("res://scripts/combat/combat_modifiers.gd")
 const TurnManager := preload("res://scripts/turn/turn_manager.gd")
 const DamagePreview := preload("res://scripts/ui/damage_preview.gd")
+const DamagePopup := preload("res://scripts/ui/damage_popup.gd")
 const VictoryChecker := preload("res://scripts/scenario/victory_checker.gd")
 const AIController := preload("res://scripts/turn/ai_controller.gd")
 
@@ -79,6 +80,10 @@ var selfplay_difficulty: Dictionary = {}
 var max_turns: int = 0
 var _fast_mode: bool = false
 
+# Combat log (runtime-built, top-left): last few resolved events.
+var _log_label: RichTextLabel = null
+var _log_lines: Array = []
+
 func _ready() -> void:
 	_fast_mode = not selfplay_difficulty.is_empty()
 	hex_map.animate_moves = not _fast_mode
@@ -136,7 +141,44 @@ func _connect_ui() -> void:
 	menu_button.pressed.connect(_on_result_button)
 	result_panel.visible = false
 	_make_hud_clickthrough()
+	_build_combat_log()
 	_update_action_buttons()
+
+func _build_combat_log() -> void:
+	if _fast_mode:
+		return
+	var panel := Panel.new()
+	panel.name = "CombatLog"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.position = Vector2(14, 44)
+	panel.size = Vector2(360, 116)
+	$UI.add_child(panel)
+	_log_label = RichTextLabel.new()
+	_log_label.bbcode_enabled = true
+	_log_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_log_label.anchor_right = 1.0
+	_log_label.anchor_bottom = 1.0
+	_log_label.offset_left = 8
+	_log_label.offset_top = 6
+	_log_label.offset_right = -8
+	_log_label.offset_bottom = -6
+	_log_label.add_theme_font_size_override("normal_font_size", 13)
+	panel.add_child(_log_label)
+
+# Append one line to the combat log (newest at the bottom, keep the last few).
+func _log(msg: String) -> void:
+	if _log_label == null:
+		return
+	_log_lines.append("第%d回合 · %s" % [turn_manager.turn_number, msg])
+	if _log_lines.size() > 6:
+		_log_lines = _log_lines.slice(_log_lines.size() - 6)
+	_log_label.text = "\n".join(_log_lines)
+
+# Floating damage number over a unit (skipped in headless self-play).
+func _popup(world_pos: Vector2, amount: int, color: Color = Color(1.0, 0.55, 0.45)) -> void:
+	if _fast_mode:
+		return
+	DamagePopup.spawn(hex_map, world_pos, amount, color)
 
 # Display-only HUD elements must let clicks pass through to the map, or the hexes
 # they overlap can't be clicked. Only the actual buttons keep capturing input.
@@ -277,11 +319,19 @@ func _perform_attack(attacker: Unit, target: Unit) -> void:
 	if not result.defender_dies and result.counter_damage > 0 and attacker.is_alive():
 		target.play_attack_animation(attacker.position)
 		attacker.take_damage(result.counter_damage)
+		_popup(attacker.position, result.counter_damage, Color(1.0, 0.8, 0.4))
 		if not attacker.is_alive():
 			_kill_unit(attacker)
 			target.gain_xp(2)
 	if attacker.is_alive():
 		attacker.gain_xp(2 if result.defender_dies else 1)
+
+	var log_msg := "%s → %s %d傷" % [attacker.display_name, target.display_name, result.damage_to_defender]
+	if result.defender_dies:
+		log_msg += " [擊殺]"
+	elif result.counter_damage > 0:
+		log_msg += " (反擊 %d)" % result.counter_damage
+	_log(log_msg)
 
 	_refresh_visibility()
 	_update_selected_panel()
@@ -292,6 +342,7 @@ func _perform_attack(attacker: Unit, target: Unit) -> void:
 
 func _apply_hit(attacker: Unit, target: Unit, result, is_reaction: bool) -> void:
 	target.take_damage(result.damage_to_defender)
+	_popup(target.position, result.damage_to_defender)
 	if result.defender_dig_in_loss > 0:
 		target.reduce_dig_in(result.defender_dig_in_loss)
 	if result.defender_dies:
@@ -330,6 +381,7 @@ func _apply_splash(attacker: Unit, center: Unit, atk_def: Dictionary, atk_mods: 
 			_terrain_def(u.coord), radius + 1, u.dig_in_level, atk_mods, def_mods, true)
 		var dmg := CombatEffects.splash_damage(full.damage_to_defender, pct)
 		u.take_damage(dmg)
+		_popup(u.position, dmg, Color(1.0, 0.7, 0.3))
 		if not u.is_alive():
 			_kill_unit(u)
 		else:
@@ -359,10 +411,12 @@ func _resolve_brace_reactions(mover: Unit) -> void:
 		u.play_attack_animation(mover.position)
 		_flash_status("%s 對 %s 進行預備射擊!" % [u.display_name, mover.display_name])
 		_apply_hit(u, mover, react, true)
+		_log("%s 預備射擊 → %s %d傷" % [u.display_name, mover.display_name, react.damage_to_defender])
 		u.gain_xp(1)
 		await _pause(0.12)
 
 func _kill_unit(u: Unit) -> void:
+	_log("[color=#e05050]%s 陣亡[/color]" % u.display_name)
 	hex_map.place_wreckage(u.coord, u.faction_color)
 	hex_map.unregister_unit(u)
 	units.erase(u)
