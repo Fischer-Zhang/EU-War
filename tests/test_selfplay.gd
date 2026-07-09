@@ -83,16 +83,20 @@ func _run() -> void:
 			fids.append(String(f.get("id", "")))
 		if fids.size() < 2:
 			continue
-		for combo in [["hard", "easy"], ["easy", "hard"], ["normal", "normal"]]:
-			var diffs := {fids[0]: combo[0], fids[1]: combo[1]}
-			var r = await _play(sid, diffs)
-			battles += 1
-			ok(r.over, "%s %s terminates within %d turns" % [sid, diffs, CAP])
-			ok(r.valid_winner, "%s %s produced a valid winner (%s)" % [sid, diffs, r.winner])
-			ok(r.synced, "%s %s units stay synced (unique hex + drawn on coord)" % [sid, diffs])
-			var win = r.winner if r.winner != "" else "draw"
-			print("  %s | %s=%s %s=%s -> %-8s alive=%s t=%d" % [
-				sid, fids[0], combo[0], fids[1], combo[1], win, r.alive, r.turns])
+		# Termination / sync / valid-winner stress on EVERY scenario, using one
+		# representative pairing (normal vs normal). This exercises each side's
+		# data posture (aggressive/defensive) and catches broken maps (stalls,
+		# desyncs, crashes). Cost stays ~1 battle per scenario so the suite scales
+		# as content grows — the full difficulty matrix runs on the sandbox mirror
+		# below, and the defensive-hold guards cover specific hard pairings.
+		var diffs := {fids[0]: "normal", fids[1]: "normal"}
+		var r = await _play(sid, diffs)
+		battles += 1
+		ok(r.over, "%s %s terminates within %d turns" % [sid, diffs, CAP])
+		ok(r.valid_winner, "%s %s produced a valid winner (%s)" % [sid, diffs, r.winner])
+		ok(r.synced, "%s %s units stay synced (unique hex + drawn on coord)" % [sid, diffs])
+		var win = r.winner if r.winner != "" else "draw"
+		print("  %s | %s vs %s -> %-8s alive=%s t=%d" % [sid, fids[0], fids[1], win, r.alive, r.turns])
 
 	# Defensive-behavior guard: a competent defender with a posture and ranged
 	# stand-off must HOLD, not charge out and get wiped (before this fix,
