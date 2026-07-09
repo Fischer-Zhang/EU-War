@@ -208,15 +208,18 @@ func _candidate_context(unit, cand: Vector2i, units: Array, hex_map, faction: St
 	unit.coord = original
 	return {"map": candidate_map, "visible": visible}
 
-# Per-faction posture multipliers on cover / exposure-aversion / advance drive.
+# Per-faction posture multipliers on cover / exposure-aversion / advance drive /
+# trade-veto. "veto" scales how hard the AI refuses an unfavourable (chip-and-die)
+# trade: a defender hoards force, but an aggressor must accept attrition to storm
+# a dug-in cluster — otherwise every unit declines the assault and nobody moves.
 static func _posture_mods(posture: String) -> Dictionary:
 	match posture:
 		"defensive":
-			return {"cover": 2.5, "exposure": 1.8, "advance": 0.2}
+			return {"cover": 2.5, "exposure": 1.8, "advance": 0.2, "veto": 1.3}
 		"aggressive":
-			return {"cover": 0.8, "exposure": 0.6, "advance": 1.3}
+			return {"cover": 0.8, "exposure": 0.6, "advance": 1.3, "veto": 0.2}
 		_:
-			return {"cover": 1.0, "exposure": 1.0, "advance": 1.0}
+			return {"cover": 1.0, "exposure": 1.0, "advance": 1.0, "veto": 1.0}
 
 func _score_destination(unit, cand: Vector2i, unit_def: Dictionary, general_def: Dictionary,
 		units: Array, hex_map, visible: Dictionary, faction: String, pmods: Dictionary) -> Dictionary:
@@ -267,7 +270,7 @@ func _score_destination(unit, cand: Vector2i, unit_def: Dictionary, general_def:
 		# latter is penalised, so units still grind when they can survive the reply.
 		var net := loss - best_attack_score * 1.5
 		if net > 0.0:
-			score -= net * float(weights["trade"]) * float(pmods["exposure"]) * 0.6
+			score -= net * float(weights["trade"]) * float(pmods["veto"]) * 0.6
 
 	# Coordination: fighting alongside neighbours is safer and concentrates force;
 	# a lone thrust deep into the enemy is discouraged (and, above, more lethal).

@@ -81,6 +81,7 @@ var _deploy_bar: Panel = null
 var selfplay_difficulty: Dictionary = {}
 var max_turns: int = 0
 var _fast_mode: bool = false
+var force_ai_posture: Dictionary = {}   # faction_id -> posture (test/self-play override)
 
 # Combat log (runtime-built, top-left): last few resolved events.
 var _log_label: RichTextLabel = null
@@ -119,6 +120,11 @@ func _setup_scenario() -> void:
 	var built := UnitFactory.build(scenario, hex_map)
 	factions = built["factions"]
 	units = built["units"]
+	# Test/self-play hook: force a faction's AI posture (e.g. to measure how an
+	# aggressive attacker fares against a dug-in defender).
+	for fid in force_ai_posture.keys():
+		if factions.has(fid):
+			factions[fid]["posture"] = String(force_ai_posture[fid])
 	for u in units:
 		hex_map.register_unit(u)
 		u.ranked_up.connect(func(_r): _flash_status("%s 晉升!" % u.display_name))
