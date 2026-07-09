@@ -307,7 +307,8 @@
       "name": "神聖羅馬帝國",
       "controller": "ai",
       "ai": "balanced",
-      "color": "#7a2f2f"
+      "color": "#7a2f2f",
+      "posture": "aggressive"
     }
   ],
   "units": [

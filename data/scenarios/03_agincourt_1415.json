@@ -220,7 +220,8 @@
       "name": "法蘭西",
       "controller": "ai",
       "ai": "aggressive",
-      "color": "#3b5ac2"
+      "color": "#3b5ac2",
+      "posture": "aggressive"
     }
   ],
   "units": [
@@ -232,7 +233,8 @@
         3,
         3
       ],
-      "general": "henry_v"
+      "general": "henry_v",
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -241,7 +243,8 @@
       "at": [
         3,
         5
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -250,7 +253,8 @@
       "at": [
         3,
         7
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -259,7 +263,8 @@
       "at": [
         4,
         4
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -268,7 +273,8 @@
       "at": [
         4,
         6
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -277,7 +283,8 @@
       "at": [
         5,
         5
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "france",

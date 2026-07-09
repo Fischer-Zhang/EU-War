@@ -261,7 +261,8 @@
       "name": "法蘭西",
       "controller": "ai",
       "ai": "aggressive",
-      "color": "#3b5ac2"
+      "color": "#3b5ac2",
+      "posture": "aggressive"
     }
   ],
   "units": [

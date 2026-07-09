@@ -294,7 +294,8 @@
       "name": "英格蘭",
       "controller": "ai",
       "ai": "hard",
-      "color": "#c23b3b"
+      "color": "#c23b3b",
+      "posture": "aggressive"
     }
   ],
   "units": [
@@ -305,7 +306,8 @@
       "at": [
         3,
         3
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "scotland",
@@ -314,7 +316,8 @@
       "at": [
         3,
         5
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "scotland",
@@ -323,7 +326,8 @@
       "at": [
         3,
         7
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "scotland",
@@ -332,7 +336,8 @@
       "at": [
         3,
         9
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "scotland",
@@ -341,7 +346,8 @@
       "at": [
         2,
         6
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "scotland",
@@ -350,7 +356,8 @@
       "at": [
         1,
         4
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "scotland",

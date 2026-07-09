@@ -300,7 +300,8 @@
       "id": "grand_alliance",
       "name": "大同盟",
       "controller": "player",
-      "color": "#c23b3b"
+      "color": "#c23b3b",
+      "posture": "aggressive"
     },
     {
       "id": "france_bavaria",

@@ -273,7 +273,8 @@
       "name": "瑞士",
       "controller": "ai",
       "ai": "hard",
-      "color": "#b0402f"
+      "color": "#b0402f",
+      "posture": "aggressive"
     }
   ],
   "units": [
@@ -405,8 +406,8 @@
     },
     {
       "faction": "swiss",
-      "type": "crossbowmen",
-      "name": "弩手",
+      "type": "pikemen",
+      "name": "長矛隊",
       "at": [
         15,
         7

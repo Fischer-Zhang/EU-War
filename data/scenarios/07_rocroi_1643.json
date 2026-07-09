@@ -312,7 +312,8 @@
       "id": "france",
       "name": "法蘭西",
       "controller": "player",
-      "color": "#2f6fb0"
+      "color": "#2f6fb0",
+      "posture": "aggressive"
     },
     {
       "id": "spain",

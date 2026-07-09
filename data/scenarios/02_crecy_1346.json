@@ -262,7 +262,8 @@
       "name": "法蘭西",
       "controller": "ai",
       "ai": "aggressive",
-      "color": "#3b5ac2"
+      "color": "#3b5ac2",
+      "posture": "aggressive"
     }
   ],
   "units": [
@@ -274,7 +275,8 @@
         12,
         2
       ],
-      "general": "edward_black_prince"
+      "general": "edward_black_prince",
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -283,7 +285,8 @@
       "at": [
         12,
         4
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -292,7 +295,8 @@
       "at": [
         12,
         7
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -301,7 +305,8 @@
       "at": [
         12,
         9
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -310,7 +315,8 @@
       "at": [
         13,
         5
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -319,7 +325,8 @@
       "at": [
         13,
         6
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "england",
@@ -328,7 +335,8 @@
       "at": [
         11,
         5
-      ]
+      ],
+      "dig_in": 1
     },
     {
       "faction": "france",

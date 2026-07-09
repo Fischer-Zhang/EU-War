@@ -294,7 +294,8 @@
       "name": "瑞典",
       "controller": "ai",
       "ai": "hard",
-      "color": "#c9a227"
+      "color": "#c9a227",
+      "posture": "aggressive"
     }
   ],
   "units": [
