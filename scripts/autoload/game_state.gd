@@ -14,6 +14,14 @@ var campaign_index: int = 0
 var campaign_roster: Array = []   # Array[Dictionary]: {type,name,xp,rank,general}
 var browsing_campaigns: bool = false   # select screen mode: campaigns vs scenarios
 
+# Side selection — which faction the human controls (the rest become AI). For a
+# single battle, player_faction_override names the chosen faction id (""=the
+# scenario's default player side). For a campaign, campaign_side picks the
+# faction INDEX (0/1) to control across every scenario, so you can play either
+# nation's arc (attacker or defender) with your veterans carrying that side.
+var player_faction_override: String = ""
+var campaign_side: int = 0
+
 # Tech tree (GLOBAL & persistent): research points earned from victories in ANY
 # mode (single battle / campaign / conquest) accrue to one shared pool, and
 # unlocked upgrades add stat modifiers to matching player units in every mode.
@@ -75,18 +83,41 @@ func end_scenario(winner: String, summary: Dictionary) -> void:
 
 # ------------------------------------------------------------------ campaign
 
-func start_campaign(id: String) -> void:
+func start_campaign(id: String, side: int = 0) -> void:
 	# Research points / unlocked techs are GLOBAL now — a campaign no longer
-	# resets them (see the tech-tree section).
+	# resets them (see the tech-tree section). `side` picks which faction index
+	# the player controls across the whole campaign.
 	campaign_id = id
 	campaign_index = 0
 	campaign_roster = []
+	campaign_side = side
+	player_faction_override = ""
 	current_scenario_id = current_campaign_scenario()
 
 func clear_campaign() -> void:
 	campaign_id = ""
 	campaign_index = 0
 	campaign_roster = []
+	campaign_side = 0
+
+# The faction the human controls in a scenario, honouring side selection: a
+# campaign's chosen faction index, else a single-battle override, else the
+# scenario's declared player faction (first controller=="player").
+func resolve_player_faction(scenario: Dictionary) -> String:
+	var facs: Array = scenario.get("factions", [])
+	if facs.is_empty():
+		return ""
+	if in_campaign():
+		var idx: int = clampi(campaign_side, 0, facs.size() - 1)
+		return String(facs[idx].get("id", ""))
+	if player_faction_override != "":
+		for f in facs:
+			if String(f.get("id", "")) == player_faction_override:
+				return player_faction_override
+	for f in facs:
+		if String(f.get("controller", "")) == "player":
+			return String(f.get("id", ""))
+	return String(facs[0].get("id", ""))
 
 func in_campaign() -> bool:
 	return campaign_id != ""
@@ -126,11 +157,7 @@ func capture_roster(living_player_units: Array) -> void:
 func apply_roster(scenario: Dictionary) -> Dictionary:
 	if not in_campaign() or campaign_roster.is_empty():
 		return scenario
-	var player_faction := ""
-	for f in scenario.get("factions", []):
-		if String(f.get("controller", "")) == "player":
-			player_faction = String(f.get("id", ""))
-			break
+	var player_faction := resolve_player_faction(scenario)
 	if player_faction == "":
 		return scenario
 	var slots: Array = []
@@ -307,6 +334,7 @@ func start_conquest(id: String) -> void:
 	conquest_industry = 0
 	conquest_training = 0
 	conquest_prep = {}
+	player_faction_override = ""   # conquest uses each territory's default sides
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", "enemy"))
 

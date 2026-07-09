@@ -75,8 +75,42 @@ func _on_scenario_picked(scenario_id: String) -> void:
 	GameState.current_scenario_id = scenario_id
 	get_tree().change_scene_to_file("res://scenes/briefing.tscn")
 
+# Picking a campaign opens a side choice: which faction you command for the
+# whole campaign (index 0/1, applied to every scenario). Veterans carry that
+# side forward, so you can play either nation's arc.
 func _on_campaign_picked(campaign_id: String) -> void:
-	GameState.start_campaign(campaign_id)
+	var camp: Dictionary = DataLoader.campaigns.get(campaign_id, {})
+	var scens: Array = camp.get("scenarios", [])
+	if scens.is_empty():
+		return
+	var first := DataLoader.get_scenario(String(scens[0]))
+	var facs: Array = first.get("factions", [])
+	for child in list.get_children():
+		child.queue_free()
+	title_label.text = String(camp.get("title", campaign_id))
+	hint_label.text = "選擇你要指揮的一方——整場戰役沿用同一方,存活老兵代代相傳。"
+	for i in range(mini(2, facs.size())):
+		var f: Dictionary = facs[i]
+		var side := i
+		var role := "守勢" if String(f.get("posture", "")) == "defensive" else "攻勢"
+		var btn := Button.new()
+		btn.text = "以 %s(%s)出戰" % [String(f.get("name", f.get("id", ""))), role]
+		btn.custom_minimum_size = Vector2(0, 46)
+		btn.add_theme_font_size_override("font_size", 18)
+		btn.clip_text = true
+		btn.pressed.connect(func(): _start_campaign_side(campaign_id, side))
+		list.add_child(btn)
+	var back := Button.new()
+	back.text = "‹ 返回戰役清單"
+	back.custom_minimum_size = Vector2(0, 40)
+	back.pressed.connect(func():
+		title_label.text = "戰役"
+		hint_label.text = "選擇一個戰役,依序打完多場串接會戰。存活部隊會帶著老兵經驗進入下一場。"
+		_rebuild_campaign_list())
+	list.add_child(back)
+
+func _start_campaign_side(campaign_id: String, side: int) -> void:
+	GameState.start_campaign(campaign_id, side)
 	get_tree().change_scene_to_file("res://scenes/lounge.tscn")
 
 func _on_back_pressed() -> void:

@@ -122,13 +122,18 @@ func _setup_scenario() -> void:
 	for u in units:
 		hex_map.register_unit(u)
 		u.ranked_up.connect(func(_r): _flash_status("%s 晉升!" % u.display_name))
-	# Player faction = first faction whose controller is "player".
-	for fid in factions.keys():
-		if String(factions[fid].get("controller", "")) == "player":
-			player_faction = fid
-			break
-	if player_faction == "":
+	# Player faction honours side selection (single-battle override / campaign
+	# side); everyone else is AI. Falls back to the scenario's declared player.
+	player_faction = GameState.resolve_player_faction(scenario)
+	if player_faction == "" or not factions.has(player_faction):
 		player_faction = factions.keys()[0]
+	# If the human took a defensively-postured side, make the AI opponents press
+	# the attack — a balanced AI attacker just stalls (see self-play findings).
+	# Skipped in self-play so the headless balance guards keep the data postures.
+	if not _fast_mode and String(factions[player_faction].get("posture", "balanced")) == "defensive":
+		for fid in factions.keys():
+			if fid != player_faction:
+				factions[fid]["posture"] = "aggressive"
 	_apply_deploy_generals()
 	_apply_tech_bonuses()
 	_apply_conquest_bonuses()
@@ -666,7 +671,9 @@ func _terrain_def(coord: Vector2i) -> Dictionary:
 func _is_ai(faction_id: String) -> bool:
 	if not selfplay_difficulty.is_empty():
 		return true  # self-play: every faction is AI-driven
-	return String(factions.get(faction_id, {}).get("controller", "ai")) != "player"
+	# Exactly one human faction (the resolved player side); everyone else is AI.
+	# This honours side selection regardless of the scenario's data controller.
+	return faction_id != player_faction
 
 func _ai_difficulty_for(faction_id: String) -> String:
 	return String(selfplay_difficulty.get(faction_id, GameState.difficulty))

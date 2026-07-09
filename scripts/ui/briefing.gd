@@ -18,8 +18,38 @@ func _ready() -> void:
 	scenario = GameState.apply_roster(scenario)
 	title_label.text = String(scenario.get("title", ""))
 	era_label.text = String(scenario.get("era", ""))
+	_build_side_picker(scenario)
 	body.text = _compose(scenario)
 	start_button.grab_focus()
+
+# Single-battle side selection: pick which faction to control. Hidden in
+# campaign (side is chosen once at campaign start) and conquest (fixed role).
+func _build_side_picker(scenario: Dictionary) -> void:
+	if GameState.in_campaign() or GameState.in_conquest():
+		return
+	var facs: Array = scenario.get("factions", [])
+	if facs.size() < 2:
+		return
+	var current := GameState.resolve_player_faction(scenario)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var lbl := Label.new()
+	lbl.text = "選擇陣營:"
+	row.add_child(lbl)
+	for f in facs:
+		var fid := String(f.get("id", ""))
+		var role := "守" if String(f.get("posture", "")) == "defensive" else "攻"
+		var b := Button.new()
+		b.text = "%s(%s)" % [String(f.get("name", fid)), role]
+		b.toggle_mode = true
+		b.button_pressed = (fid == current)
+		b.pressed.connect(func():
+			GameState.player_faction_override = fid
+			get_tree().reload_current_scene())
+		row.add_child(b)
+	var vbox := era_label.get_parent()
+	vbox.add_child(row)
+	vbox.move_child(row, era_label.get_index() + 1)
 
 func _campaign_header() -> String:
 	if not GameState.in_campaign():
@@ -46,8 +76,10 @@ func _compose(scenario: Dictionary) -> String:
 	var faction_names := {}
 	for f in scenario.get("factions", []):
 		faction_names[String(f.get("id", ""))] = String(f.get("name", ""))
+	var you := GameState.resolve_player_faction(scenario)
 	for fid in by_faction.keys():
-		lines.append("[b]%s[/b]" % faction_names.get(fid, fid))
+		var mark := "  [color=#7fd08f](你)[/color]" if fid == you else ""
+		lines.append("[b]%s[/b]%s" % [faction_names.get(fid, fid), mark])
 		var parts := []
 		for t in by_faction[fid].keys():
 			var def := DataLoader.get_unit_def(t)
