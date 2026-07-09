@@ -38,6 +38,17 @@ func _run() -> void:
 	ok(gs.resolve_player_faction(scen) == f1, "override flips single-battle player to %s" % f1)
 	gs.player_faction_override = "bogus"
 	ok(gs.resolve_player_faction(scen) == f0, "invalid override falls back to default side")
+
+	# General deployment must list the CHOSEN side's units, not the historical
+	# player's (regression: picking France still offered England's generals).
+	gs.player_faction_override = f1
+	var chosen_units: Array = gs.player_units_in(scen)
+	var expected := 0
+	for u in scen.get("units", []):
+		if String(u.get("faction", "")) == f1:
+			expected += 1
+	ok(expected > 0 and chosen_units.size() == expected,
+		"deployment lists the chosen side's units (%d of %s)" % [chosen_units.size(), f1])
 	gs.player_faction_override = ""
 
 	# Resolver: campaign side picks the faction INDEX across scenarios.

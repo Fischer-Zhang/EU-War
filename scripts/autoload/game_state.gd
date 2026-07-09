@@ -56,11 +56,9 @@ func clear_deploy_generals() -> void:
 
 # Ordered player-faction units of a (resolved) scenario, each with a stable key.
 func player_units_in(scenario: Dictionary) -> Array:
-	var pf := ""
-	for f in scenario.get("factions", []):
-		if String(f.get("controller", "")) == "player":
-			pf = String(f.get("id", ""))
-			break
+	# The side the human actually commands (honours single-battle / campaign side
+	# selection), not just the scenario's declared player faction.
+	var pf := resolve_player_faction(scenario)
 	var out: Array = []
 	var counts := {}
 	for u in scenario.get("units", []):
