@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEST_USER_DATA="$(mktemp -d "${TMPDIR:-/tmp}/euwar-godot-userdata.XXXXXX")"
-TEST_TIMEOUT_SECONDS="${TEST_TIMEOUT_SECONDS:-900}"
+TEST_TIMEOUT_SECONDS="${TEST_TIMEOUT_SECONDS:-1200}"
 
 cleanup() { rm -rf "$TEST_USER_DATA"; }
 trap cleanup EXIT

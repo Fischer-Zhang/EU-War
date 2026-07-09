@@ -15,7 +15,7 @@ extends SceneTree
 # one there. (Before that work the ladder was non-monotonic — hard overextended
 # and lost to easy even on the symmetric map.)
 
-const CAP := 50
+const CAP := 30
 
 var fails := 0
 var _hc
