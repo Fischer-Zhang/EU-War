@@ -134,13 +134,15 @@ tools/validate.sh        # 上述 + 全部無頭 GDScript 測試
 
 ## 新增劇本
 
-1. 複製 `data/scenarios/` 中的一個 JSON。
-2. 修改 `id`、`title`、`era`、`briefing`、`map`、`factions`、`units`、`victory`。
-3. 座標使用 odd-r 偏移 `[col, row]`,執行期轉為軸向六角座標。
-4. (可選)在 `factions[]` 加 `"posture"` 調整該陣營的 AI 傾向:`"balanced"`(預設)、`"defensive"`(重視掩蔽、避免曝險、固守不躁進——適合防守方)、`"aggressive"`(積極推進)。
-5. (可選)加入 `deployment` 讓玩家在開戰前排陣:`"deployment": { "blue": { "cols": [0, 4], "rows": [0, 9] } }` —— 指定該陣營可部署的 odd-r 矩形範圍(含端點),戰鬥開始前玩家可在區內移動或互換己方部隊。省略則無部署階段。
-6. (可選)`tutorial` 提供分步教學提示:字串或 `{ "text": "...", "advance_on": "move" }`,`advance_on` 可為單一動作或陣列(`select`/`move`/`attack_ranged`/`attack_melee`/`entrench`/`brace`/`rally`)。
-7. 執行 `tools/validate_fast.sh`;劇本會自動出現在單次作戰列表。
+完整規範見 **[docs/SCENARIO_STANDARD.md](docs/SCENARIO_STANDARD.md)**(史實配置、選邊、勝利條件、工事/破陣、戰役/征服整合、驗證流程)。速覽:
+
+1. 複製 `data/scenarios/` 中的一個 JSON,改 `id`(與檔名一致)、`title`、`era`、`briefing`、`map`、`factions`、`units`、`victory`。
+2. 座標使用 odd-r 偏移 `[col, row]`,執行期轉為軸向六角座標。
+3. **恰好兩個陣營**:`factions[0]` 為歷史主角方(單場預設玩家),兩方皆可被選邊操控——故**雙方都要有可達成的 `victory`**。
+4. **posture 依史實**:進攻方 `"aggressive"`、防守方 `"defensive"`(省略即 `"balanced"`)。有備而戰的防守方適度加 `dig_in`;若要能破深工事,攻方需配 `pioneers`/`mortar`(或刻意不配以還原史實)。
+5. (可選)`deployment`(開戰前排陣區)、`reinforcements`(排程增援)、`secondary_objectives`(次要目標)、`tutorial`(分步教學提示)、歷史將領。
+6. 併入戰役/征服:更新 `data/campaigns.json` / `data/conquest.json`。
+7. 驗證:`tools/validate_fast.sh`(或 `validate.sh` 含全測試)+ `tools/balance_report.py --check`;`test_selfplay` 會自動涵蓋新劇本。劇本會自動出現在單次作戰列表。
 
 ## 路線圖
 
