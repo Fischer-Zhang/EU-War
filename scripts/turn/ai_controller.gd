@@ -321,6 +321,18 @@ func _attack_value(unit, unit_def: Dictionary, atk_mods: Dictionary,
 		value += weights["kill_bonus"]
 	value += float(result.suppression_to_defender) * 0.5
 	value -= float(result.counter_damage) * weights["counter_risk"] * 0.6
+	# Softening (lever C). Stripping entrenchment is a force multiplier — every
+	# future hit on this target (and its neighbours' fire) lands harder — so it is
+	# worth far more than the immediate chip. This is what lets pioneers/mortars
+	# open a dug-in cluster that raw chip never breaks.
+	value += float(result.defender_dig_in_loss) * 3.0
+	# Siege priority: crews that draw no counter (field guns) or fire indirect
+	# (mortars) are the safe way to grind a target hunkered in cover or works —
+	# steer them onto the hard cluster rather than soft targets in the open.
+	if unit_def.get("no_counter", false) or unit_def.get("indirect", false):
+		var hardness: int = int(_terrain_def(hex_map, target.coord).get("defense", 0)) + int(target.dig_in_level)
+		if hardness > 0:
+			value += float(hardness) * 1.5
 	return value
 
 func _exposure_at(cand: Vector2i, unit, unit_def: Dictionary, _atk_mods: Dictionary,

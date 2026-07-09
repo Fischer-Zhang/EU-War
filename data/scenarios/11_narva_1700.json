@@ -450,6 +450,15 @@
         2,
         7
       ]
+    },
+    {
+      "faction": "sweden",
+      "type": "mortar",
+      "name": "攻城臼砲",
+      "at": [
+        1,
+        6
+      ]
     }
   ],
   "victory": {
