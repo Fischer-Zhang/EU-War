@@ -1156,10 +1156,13 @@ func _end_battle(w: String) -> void:
 		GameState.capture_roster(_living_units_of(player_faction))
 		GameState.advance_campaign()
 	# Conquest: apply the battle to the strategic map (capture on an attack win,
-	# secure/lose on a defense). Read the mode before resolving clears it.
+	# secure/lose on a defense). Read the mode before resolving clears it. A win
+	# also banks the survivors as veterans carried into the next conquest battle.
 	var conq_defense := false
 	if GameState.in_conquest():
 		conq_defense = bool(GameState.conquest_battle.get("defense", false))
+		if player_won:
+			GameState.capture_roster(_living_units_of(player_faction))
 		GameState.resolve_conquest_battle(player_won)
 	result_label.text = "勝利!" if player_won else "戰敗"
 	result_label.modulate = Color(0.4, 0.9, 0.4) if player_won else Color(0.9, 0.4, 0.4)

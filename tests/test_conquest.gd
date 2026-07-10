@@ -8,6 +8,17 @@ extends SceneTree
 
 var fails := 0
 
+# Minimal stand-in for a Unit — capture_roster only reads these fields.
+class FakeUnit:
+	extends RefCounted
+	var type_id: String
+	var display_name: String
+	var xp: int
+	var rank: int
+	var general_id: String
+	func _init(t, x, r):
+		type_id = t; display_name = t; xp = x; rank = r; general_id = ""
+
 func ok(cond: bool, msg: String) -> void:
 	if cond:
 		print("  PASS: ", msg)
@@ -188,6 +199,35 @@ func _run() -> void:
 	ok(not gs.can_fortify("picardy"), "cannot fortify a cut-off territory")
 	ok(not gs.territory_attackable("lowlands"), "cannot stage an attack from a cut-off pocket")
 	ok(gs.territory_attackable("normandy"), "can still attack to reconnect the severed link")
+
+	# --- Conquest roster: veterans carry between conquest battles ---
+	gs.start_conquest(qid)
+	ok(gs.conquest_roster.is_empty(), "conquest roster starts empty")
+	gs.capture_roster([FakeUnit.new("longbowmen", 6, 2), FakeUnit.new("men_at_arms", 3, 1)])
+	ok(gs.conquest_roster.size() == 2 and gs.campaign_roster.is_empty(),
+		"capturing in conquest fills the conquest roster, not the campaign one")
+	# Applying it to a conquest scenario overlays veterans and replenishes the rest.
+	var terr: Dictionary = gs.conquest_territory("normandy")
+	var cs: Dictionary = dl.get_scenario(String(terr.get("scenario", "")))
+	var pf2 := ""
+	for f in cs.get("factions", []):
+		if f.get("controller") == "player":
+			pf2 = String(f.get("id", ""))
+	var slot_count := 0
+	for u in cs.get("units", []):
+		if String(u.get("faction", "")) == pf2:
+			slot_count += 1
+	var applied: Dictionary = gs.apply_roster(cs)
+	var players := 0
+	var vets := 0
+	for u in applied.get("units", []):
+		if String(u.get("faction", "")) == pf2:
+			players += 1
+			if int(u.get("xp", 0)) > 0:
+				vets += 1
+	ok(slot_count > 2, "conquest scenario has more slots than the 2 survivors")
+	ok(players == slot_count, "conquest battle fields the full force (veterans + replenished recruits)")
+	ok(vets == 2, "2 veterans carried into the conquest battle")
 
 	# Map builds.
 	gs.start_conquest(qid)

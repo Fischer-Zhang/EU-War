@@ -138,22 +138,31 @@ func campaign_complete() -> bool:
 	return campaign_index >= campaign_scenarios().size()
 
 # Snapshot the surviving player units into the roster for the next battle.
+# Bank the surviving player units into the active mode's roster (campaign or
+# conquest — the two are mutually exclusive), preserving XP/rank/general.
 func capture_roster(living_player_units: Array) -> void:
-	campaign_roster = []
+	var captured: Array = []
 	for u in living_player_units:
-		campaign_roster.append({
+		captured.append({
 			"type": u.type_id,
 			"name": u.display_name,
 			"xp": u.xp,
 			"rank": u.rank,
 			"general": u.general_id,
 		})
+	if in_conquest():
+		conquest_roster = captured
+	else:
+		campaign_roster = captured
 
 # Return a scenario dict whose player units are replaced by the carried roster,
 # mapped onto the scenario's own player slot positions (order-preserving). Units
 # start at full HP. A no-op when not in a campaign or the roster is empty.
 func apply_roster(scenario: Dictionary) -> Dictionary:
-	if not in_campaign() or campaign_roster.is_empty():
+	# The active mode's carried veterans (campaign or conquest); the two modes are
+	# mutually exclusive, so at most one roster is live.
+	var roster: Array = campaign_roster if in_campaign() else (conquest_roster if in_conquest() else [])
+	if roster.is_empty():
 		return scenario
 	var player_faction := resolve_player_faction(scenario)
 	if player_faction == "":
@@ -165,9 +174,9 @@ func apply_roster(scenario: Dictionary) -> Dictionary:
 			slots.append(u)
 		else:
 			new_units.append(u)
-	var placed := mini(slots.size(), campaign_roster.size())
+	var placed := mini(slots.size(), roster.size())
 	for i in range(placed):
-		var r: Dictionary = campaign_roster[i]
+		var r: Dictionary = roster[i]
 		var slot: Dictionary = slots[i]
 		var vet := {
 			"faction": player_faction,
@@ -187,9 +196,9 @@ func apply_roster(scenario: Dictionary) -> Dictionary:
 	# force, not a dwindling pool that spirals into an unwinnable battle.
 	for i in range(placed, slots.size()):
 		new_units.append(slots[i])
-	if campaign_roster.size() > slots.size():
-		push_warning("[Campaign] roster (%d) exceeds scenario player slots (%d); extra veterans benched" % [
-			campaign_roster.size(), slots.size()])
+	if roster.size() > slots.size():
+		push_warning("[Roster] roster (%d) exceeds scenario player slots (%d); extra veterans benched" % [
+			roster.size(), slots.size()])
 	var out := scenario.duplicate(true)
 	out["units"] = new_units
 	return out
@@ -329,6 +338,7 @@ var conquest_army: int = 0
 var conquest_industry: int = 0
 var conquest_training: int = 0
 var conquest_prep: Dictionary = {}        # prep kind -> true, for the pending battle
+var conquest_roster: Array = []           # surviving veterans carried between conquest battles
 
 func start_conquest(id: String) -> void:
 	conquest_id = id
@@ -342,6 +352,7 @@ func start_conquest(id: String) -> void:
 	conquest_industry = 0
 	conquest_training = 0
 	conquest_prep = {}
+	conquest_roster = []
 	player_faction_override = ""   # conquest uses each territory's default sides
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", "enemy"))
@@ -358,6 +369,7 @@ func clear_conquest() -> void:
 	conquest_industry = 0
 	conquest_training = 0
 	conquest_prep = {}
+	conquest_roster = []
 
 func in_conquest() -> bool:
 	return conquest_id != ""

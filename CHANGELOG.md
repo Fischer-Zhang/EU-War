@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.35 — 征服:老兵跨戰延續(roster)
+
+征服現在像戰役一樣**養成一支自己的軍隊**——每場勝利後,存活部隊(帶 XP/階/將領)編入下一場征服戰鬥,把征服從一連串獨立會戰變成連貫的長線。
+
+- **底層**:`GameState` 新增 `conquest_roster`;`capture_roster`/`apply_roster` 泛化為模式感知——征服中寫入/套用 `conquest_roster`,戰役中維持 `campaign_roster`(兩模式互斥)。征服戰鬥於 `battle._end_battle` 勝利時捕獲存活者;`start/clear_conquest` 重置。
+- **補兵防螺旋**:沿用 v0.33 的補充機制——每場以該劇本預設兵員填滿空缺格,老兵是加成疊層,減員不會滾成打不過(征服戰線可能很長,這點更重要)。
+- **敗仗**:輸掉不捕獲 roster(重試/續戰仍用上次勝利的老兵陣容),與戰役一致。
+- **測試**:`test_conquest` 新增——征服中捕獲寫入 `conquest_roster`(非 campaign)、套用時老兵覆蓋 + 補滿至該劇本足額。既有戰役 roster 測試不受泛化影響。
+
 ## v0.34 — 征服:補給網(A 第二段)
 
 參考姊妹作 WorldWarII 的後勤層,為征服加入**補給網**——戰略地圖上最後一塊缺的維度:
