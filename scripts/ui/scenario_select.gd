@@ -73,6 +73,10 @@ func _refresh_difficulty_buttons() -> void:
 
 func _on_scenario_picked(scenario_id: String) -> void:
 	GameState.current_scenario_id = scenario_id
+	# Fresh single battle: start from the scenario's historical default side. The
+	# briefing's side-picker sets the override; clearing here stops a choice made
+	# for one scenario leaking into a later one that shares a faction id.
+	GameState.player_faction_override = ""
 	get_tree().change_scene_to_file("res://scenes/briefing.tscn")
 
 # Picking a campaign opens a side choice: which faction you command for the

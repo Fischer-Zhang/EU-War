@@ -94,7 +94,18 @@ func _run() -> void:
 		"AI opponent turns aggressive when the human defends")
 	b2.queue_free()
 	await process_frame
-	gs.player_faction_override = ""
+
+	# Regression: a side choice for one single battle must NOT leak into the next
+	# scenario (override is cleared when a fresh single battle is picked). Faction
+	# ids like "france" recur across scenarios, so a stale override could silently
+	# flip the player's side.
+	gs.player_faction_override = "france"   # stale choice from a previous battle
+	var sel = load("res://scenes/scenario_select.tscn").instantiate()
+	root.add_child(sel)
+	await process_frame
+	sel._on_scenario_picked("02_crecy_1346")
+	ok(gs.player_faction_override == "", "picking a fresh single battle clears the stale side override")
+	sel.queue_free()
 
 	if fails == 0:
 		print("test_side_select: ok")

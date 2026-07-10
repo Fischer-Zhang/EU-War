@@ -76,6 +76,7 @@ func _on_tech_pressed() -> void:
 func _on_single_battle_pressed() -> void:
 	GameState.clear_campaign()
 	GameState.clear_conquest()
+	GameState.player_faction_override = ""   # start single-battle side selection fresh
 	GameState.browsing_campaigns = false
 	get_tree().change_scene_to_file("res://scenes/scenario_select.tscn")
 
