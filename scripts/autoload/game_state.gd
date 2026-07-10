@@ -388,11 +388,48 @@ func _adjacent_owned_by(tid: String, side: String) -> bool:
 			return true
 	return false
 
-# Enemy-owned AND on the frontline (adjacent to a player-owned territory).
+# --- Supply network ---
+# A supply source is the homeland (a territory that STARTS player-owned) or any
+# territory flagged "supply": true in the data. A player territory is supplied if
+# a chain of player-owned territories connects it back to a source; a territory
+# cut off by an enemy counter-attack earns no income and can't stage offensives.
+
+func conquest_supply_sources() -> Array:
+	var out: Array = []
+	for t in conquest_territories():
+		if bool(t.get("supply", false)) or String(t.get("owner", "")) == "player":
+			out.append(String(t.get("id", "")))
+	return out
+
+# Dictionary[tid -> true] of player territories tracing supply back to a source.
+func conquest_supplied() -> Dictionary:
+	var supplied := {}
+	var stack: Array = []
+	for tid in conquest_supply_sources():
+		if String(conquest_owner.get(tid, "")) == "player" and not supplied.has(tid):
+			supplied[tid] = true
+			stack.append(tid)
+	while not stack.is_empty():
+		var cur: String = stack.pop_back()
+		for nb in _conquest_neighbors(cur):
+			if String(conquest_owner.get(nb, "")) == "player" and not supplied.has(nb):
+				supplied[nb] = true
+				stack.append(nb)
+	return supplied
+
+func territory_supplied(tid: String) -> bool:
+	return conquest_supplied().has(tid)
+
+# Enemy-owned, on the frontline, AND adjacent to a SUPPLIED player territory —
+# an offensive must stage from a territory still connected to supply.
 func territory_attackable(tid: String) -> bool:
 	if String(conquest_owner.get(tid, "")) != "enemy":
 		return false
-	return _adjacent_owned_by(tid, "player")
+	var supplied := conquest_supplied()
+	for nb in _conquest_neighbors(tid):
+		if supplied.has(nb):   # supplied.has(nb) implies nb is player-owned
+			return true
+	return false
 
 # The enemy's strategic pick: a player-held, battle-bearing frontier territory it
 # hasn't been repelled from yet. "" if it has no valid counter-attack.
@@ -468,13 +505,10 @@ func conquest_counts() -> Dictionary:
 			player += 1
 	return {"player": player, "total": total}
 
-# Strength earned per round: one per owned territory, plus industry development.
+# Strength earned per round: one per SUPPLIED owned territory, plus industry.
+# Territories cut off from supply by an enemy counter yield nothing.
 func conquest_income() -> int:
-	var n := 0
-	for tid in conquest_owner:
-		if String(conquest_owner[tid]) == "player":
-			n += 1
-	return n + conquest_industry
+	return conquest_supplied().size() + conquest_industry
 
 func can_muster() -> bool:
 	return in_conquest() and conquest_army < CONQ_ARMY_MAX and conquest_strength >= CONQ_MUSTER_COST
@@ -491,6 +525,8 @@ func can_fortify(tid: String) -> bool:
 		return false
 	if String(conquest_territory(tid).get("scenario", "")) == "":
 		return false  # the home base has no battle to fortify
+	if not territory_supplied(tid):
+		return false  # can't ship fortification materials to a cut-off territory
 	return int(conquest_fortify.get(tid, 0)) < CONQ_FORTIFY_MAX and conquest_strength >= CONQ_FORTIFY_COST
 
 func fortify(tid: String) -> bool:

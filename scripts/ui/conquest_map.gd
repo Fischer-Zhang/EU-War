@@ -13,6 +13,8 @@ const COLOR_ENEMY := Color(0.70, 0.25, 0.20)
 const COLOR_TARGET := Color(0.85, 0.65, 0.20)
 const COLOR_UNDER_ATTACK := Color(0.90, 0.40, 0.15)
 const COLOR_LINK := Color(0.5, 0.5, 0.55, 0.7)
+const COLOR_SUPPLY := Color(0.35, 0.7, 0.45, 0.9)   # active supply line
+const COLOR_CUTOFF := Color(0.45, 0.4, 0.3)          # player territory cut off from supply
 
 func _ready() -> void:
 	if not GameState.in_conquest():
@@ -44,7 +46,7 @@ func _ready() -> void:
 		status.text = "⚠ 敵軍反攻「%s」!點擊該地迎戰防守。" % String(GameState.conquest_territory(under_attack).get("name", under_attack))
 		status.modulate = Color(0.95, 0.6, 0.35)
 	else:
-		status.text = "已佔領 %d / %d — 點金色前線進攻,或點己方領地設防。每回合徵收國力。" % [counts.player, counts.total]
+		status.text = "已佔領 %d / %d — 點金色前線進攻,或點己方領地設防。綠線為補給線,斷補領地不產國力。" % [counts.player, counts.total]
 	add_child(status)
 
 	# Economy header.
@@ -96,6 +98,8 @@ func _ready() -> void:
 	for t in terrs:
 		by_id[String(t.get("id", ""))] = t
 
+	var supplied: Dictionary = GameState.conquest_supplied()
+
 	var drawn := {}
 	for t in terrs:
 		var a: Vector2 = center_of.call(t)
@@ -107,8 +111,10 @@ func _ready() -> void:
 				continue
 			drawn[key] = true
 			var line := Line2D.new()
-			line.width = 3.0
-			line.default_color = COLOR_LINK
+			# A link between two supplied territories is a live supply line.
+			var is_supply_line := supplied.has(ta) and supplied.has(tb)
+			line.width = 5.0 if is_supply_line else 3.0
+			line.default_color = COLOR_SUPPLY if is_supply_line else COLOR_LINK
 			line.points = PackedVector2Array([a, center_of.call(by_id[tb])])
 			add_child(line)
 
@@ -138,9 +144,13 @@ func _ready() -> void:
 			label += "  ⚔"
 			col = COLOR_TARGET
 		elif owner == "player":
-			if can_fort:
-				label += "  設防 %d" % GameState.CONQ_FORTIFY_COST
-			col = COLOR_SECURED if secured else COLOR_PLAYER
+			if not supplied.has(tid) and String(t.get("scenario", "")) != "":
+				label += "  ⛔斷補"   # cut off from supply: no income, can't stage/fortify
+				col = COLOR_CUTOFF
+			else:
+				if can_fort:
+					label += "  設防 %d" % GameState.CONQ_FORTIFY_COST
+				col = COLOR_SECURED if secured else COLOR_PLAYER
 		else:
 			col = COLOR_ENEMY
 		btn.text = label

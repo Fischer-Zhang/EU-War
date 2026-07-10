@@ -171,6 +171,24 @@ func _run() -> void:
 	b.queue_free()
 	await process_frame
 
+	# --- Supply network: a territory cut off from the homeland yields no income
+	# and can't stage offensives or be fortified. ---
+	gs.start_conquest(qid)
+	gs.conquest_owner["normandy"] = "player"   # home - normandy - picardy contiguous chain
+	gs.conquest_owner["picardy"] = "player"
+	var sup1: Dictionary = gs.conquest_supplied()
+	ok(sup1.has("home") and sup1.has("normandy") and sup1.has("picardy"), "a contiguous chain is fully supplied")
+	ok(gs.conquest_income() == 3 + gs.conquest_industry, "income counts all supplied territories (3)")
+	# The enemy retakes the middle link (normandy) — picardy is now cut off.
+	gs.conquest_owner["normandy"] = "enemy"
+	var sup2: Dictionary = gs.conquest_supplied()
+	ok(sup2.has("home") and not sup2.has("picardy"), "losing the link cuts off the forward territory")
+	ok(not gs.territory_supplied("picardy"), "territory_supplied() false for the cut-off pocket")
+	ok(gs.conquest_income() == 1 + gs.conquest_industry, "a cut-off territory yields no income (only home)")
+	ok(not gs.can_fortify("picardy"), "cannot fortify a cut-off territory")
+	ok(not gs.territory_attackable("lowlands"), "cannot stage an attack from a cut-off pocket")
+	ok(gs.territory_attackable("normandy"), "can still attack to reconnect the severed link")
+
 	# Map builds.
 	gs.start_conquest(qid)
 	var map = load("res://scenes/conquest_map.tscn").instantiate()

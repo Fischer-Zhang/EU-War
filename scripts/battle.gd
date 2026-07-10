@@ -989,9 +989,13 @@ func _apply_conquest_bonuses() -> void:
 	var army: int = GameState.conquest_army
 	var training: int = GameState.conquest_training
 	var defense: bool = bool(GameState.conquest_battle.get("defense", false))
+	var territory := String(GameState.conquest_battle.get("territory", ""))
 	var fort := 0
 	if defense:
-		fort = GameState.conquest_fortify_level(String(GameState.conquest_battle.get("territory", "")))
+		fort = GameState.conquest_fortify_level(territory)
+	# Defending a territory the enemy has cut off from supply: the garrison fights
+	# short of ammo and heart — start suppressed and below full morale.
+	var cut_off: bool = defense and territory != "" and not GameState.territory_supplied(territory)
 	# Pre-battle preparations (one-shot). Recon/supply help the player; barrage
 	# softens the enemy before contact.
 	var recon: bool = GameState.prep_active("recon")
@@ -1010,6 +1014,9 @@ func _apply_conquest_bonuses() -> void:
 			if supply:
 				u.dig_in_level = min(Unit.MAX_DIG_IN, u.dig_in_level + 1)
 				u.morale = u.morale_max
+			if cut_off:
+				u.add_suppression(3)
+				u.morale = max(1, u.morale - 3)
 		elif barrage:
 			# Softening barrage: suppress and lightly wound each enemy up front.
 			u.add_suppression(3)
