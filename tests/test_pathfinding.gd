@@ -10,6 +10,7 @@ class StubMap:
 	var w: int
 	var h: int
 	var impass: Dictionary = {}
+	var diff: Dictionary = {}   # hexes with move_cost 2 (forest/hills)
 	func _init(_w: int, _h: int) -> void:
 		w = _w
 		h = _h
@@ -19,9 +20,11 @@ class StubMap:
 	func terrain_at(c: Vector2i) -> String:
 		if not _in_bounds(c):
 			return ""
-		return "river" if impass.has(c) else "plain"
-	func move_cost_at(_c: Vector2i) -> int:
-		return 1
+		if impass.has(c):
+			return "river"
+		return "forest" if diff.has(c) else "plain"
+	func move_cost_at(c: Vector2i) -> int:
+		return 2 if diff.has(c) else 1
 	func terrain_impassable(t: String) -> bool:
 		return t == "river"
 	func is_bridged(_c: Vector2i) -> bool:
@@ -66,6 +69,33 @@ func _init() -> void:
 		pass_count += 1
 	else:
 		fail_count += 1; printerr("FAIL: river entered")
+
+	# Minimum-move rule: a move-1 piece ringed by difficult terrain (cost > its
+	# budget) is NOT stranded — it may still enter any one adjacent hex, but no
+	# further (no chaining across difficult terrain).
+	var m2 := StubMap.new(9, 9)
+	var s2 := Vector2i(4, 4)
+	for n in HexCoord.neighbors(s2):
+		m2.diff[n] = true
+	var reach5 := Pathfinding.movement_range(s2, 1, m2, {}, "", "")
+	if reach5.size() == 6:
+		pass_count += 1
+	else:
+		fail_count += 1; printerr("FAIL: move-1 in difficult terrain reach=%d (want 6)" % reach5.size())
+
+	var g2: Vector2i = reach5.keys()[0] if reach5.size() > 0 else s2
+	var p2 := Pathfinding.reconstruct_path(s2, g2, reach5, m2, {}, "", "")
+	if p2.size() == 2 and p2[0] == s2 and p2[-1] == g2:
+		pass_count += 1
+	else:
+		fail_count += 1; printerr("FAIL: min-move path %s" % str(p2))
+
+	# But a move-0 unit still cannot move.
+	var reach6 := Pathfinding.movement_range(s2, 0, m2, {}, "", "")
+	if reach6.is_empty():
+		pass_count += 1
+	else:
+		fail_count += 1; printerr("FAIL: move-0 unit moved (reach=%d)" % reach6.size())
 
 	print("test_pathfinding: %d passed, %d failed" % [pass_count, fail_count])
 	quit(1 if fail_count > 0 else 0)

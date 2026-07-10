@@ -39,7 +39,14 @@ static func movement_range(
 				continue
 			var new_cost := current_cost + step_cost
 			if new_cost > budget:
-				continue
+				# Minimum-move rule: a unit with movement left may always advance
+				# into ONE adjacent passable hex, spending its whole turn — without
+				# this a move-1 piece (a gun) could never enter forest/hills/marsh
+				# (cost > budget) and would be stranded in difficult terrain.
+				if current == start and move_points > 0 and not cost_to.has(n):
+					pass  # allow the single over-budget first step
+				else:
+					continue
 			if not cost_to.has(n) or new_cost < cost_to[n]:
 				cost_to[n] = new_cost
 				frontier.append(n)
