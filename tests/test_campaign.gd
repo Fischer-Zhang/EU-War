@@ -2,8 +2,10 @@ extends SceneTree
 
 # Verifies campaign chaining: starting a campaign points at its first scenario,
 # apply_roster is a no-op on battle 1, capturing survivors banks their XP/rank,
-# advancing moves to the next scenario, and apply_roster then replaces the
-# player force with the carried roster on the scenario's own player slots.
+# advancing moves to the next scenario, and apply_roster then overlays the
+# carried veterans onto the scenario's player slots while REPLENISHING the
+# remaining slots with fresh troops (so casualties never spiral into an
+# understrength, unwinnable next battle).
 
 var fails := 0
 
@@ -64,15 +66,28 @@ func _run() -> void:
 	ok(not gs.campaign_complete(), "campaign not yet complete")
 	ok(gs.current_scenario_id == String(scens[1]), "current scenario is battle 2")
 
-	# Battle 2: roster replaces the player force onto the scenario's slots.
+	# Battle 2: the 2 survivors carry as veterans, and the remaining player slots
+	# are REPLENISHED with the scenario's fresh troops — the player always fields
+	# a full force, never spiralling into an unwinnable understrength battle.
 	var s1 = dl.get_scenario(String(scens[1]))
+	var slot_count := _count_faction(s1, pf)
 	var s1_applied = gs.apply_roster(s1)
 	var players := _players_of(s1_applied, pf)
-	ok(players.size() == 2, "battle 2 player force = roster size (2)")
+	ok(slot_count > 2, "battle 2 has more player slots than survivors (exercises replenishment)")
+	ok(players.size() == slot_count, "battle 2 fields the FULL player force (%d), not just the 2 survivors" % slot_count)
+	var vets := 0
+	var fresh := 0
+	for u in players:
+		if int(u.get("xp", 0)) > 0:
+			vets += 1
+		else:
+			fresh += 1
+	ok(vets == 2, "the 2 survivors carry as veterans (xp > 0)")
+	ok(fresh == slot_count - 2, "empty slots filled with fresh recruits (xp 0)")
 	var types := []
 	for u in players:
 		types.append(u.get("type"))
-	ok("longbowmen" in types and "men_at_arms" in types, "roster unit types placed")
+	ok("longbowmen" in types and "men_at_arms" in types, "veteran unit types placed")
 	var carried_xp := false
 	for u in players:
 		if int(u.get("xp", 0)) == 7:

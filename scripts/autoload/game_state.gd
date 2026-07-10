@@ -168,15 +168,25 @@ func apply_roster(scenario: Dictionary) -> Dictionary:
 	var placed := mini(slots.size(), campaign_roster.size())
 	for i in range(placed):
 		var r: Dictionary = campaign_roster[i]
-		new_units.append({
+		var slot: Dictionary = slots[i]
+		var vet := {
 			"faction": player_faction,
 			"type": r.get("type", ""),
 			"name": r.get("name", ""),
-			"at": slots[i].get("at", [0, 0]),
+			"at": slot.get("at", [0, 0]),
 			"xp": int(r.get("xp", 0)),
 			"rank": int(r.get("rank", 0)),
 			"general": r.get("general", ""),
-		})
+		}
+		if slot.has("dig_in"):
+			vet["dig_in"] = slot["dig_in"]   # veterans inherit the slot's prepared position
+		new_units.append(vet)
+	# Replenishment: fill any player slots the roster didn't cover with the
+	# scenario's own fresh troops. Casualties in one battle never leave you
+	# understrength for the next — veterans are a bonus overlay on top of a full
+	# force, not a dwindling pool that spirals into an unwinnable battle.
+	for i in range(placed, slots.size()):
+		new_units.append(slots[i])
 	if campaign_roster.size() > slots.size():
 		push_warning("[Campaign] roster (%d) exceeds scenario player slots (%d); extra veterans benched" % [
 			campaign_roster.size(), slots.size()])
