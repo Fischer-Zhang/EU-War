@@ -66,6 +66,11 @@ func _run() -> void:
 	# Attack normandy and win -> captured, and the enemy queues a counter.
 	ok(gs.begin_conquest_attack("normandy"), "begin attack on normandy")
 	ok(gs.current_scenario_id == "02_crecy_1346", "battle scenario = territory's scenario")
+	# Attacking plays the scenario's default protagonist side.
+	var ascen = dl.get_scenario(gs.current_scenario_id)
+	var atk_side = gs.resolve_player_faction(ascen)
+	ok(atk_side == String(ascen.get("factions", [])[0].get("id", "")),
+		"attacking plays the scenario's default side (%s)" % atk_side)
 	gs.resolve_conquest_battle(true)
 	ok(gs.conquest_owner.get("normandy", "") == "player", "normandy captured on win")
 	ok(gs.has_enemy_counter(), "enemy queues a counter-attack after the player's attack")
@@ -76,6 +81,13 @@ func _run() -> void:
 	# Defend and win -> the territory is secured; enemy turn is spent.
 	ok(gs.begin_conquest_defense(), "begin defense of the counter-attacked territory")
 	var defended = String(gs.conquest_battle.get("territory", ""))
+	# Mirror布陣: defending a territory swaps you to the scenario's OTHER faction,
+	# so the fight is the reverse of the attack that took it — not a replay.
+	var dscen = dl.get_scenario(gs.current_scenario_id)
+	var def_side = gs.resolve_player_faction(dscen)
+	var dscen_default = String(dscen.get("factions", [])[0].get("id", ""))
+	ok(def_side != "" and def_side != dscen_default,
+		"defending mirrors sides: player commands the non-default faction (%s, default %s)" % [def_side, dscen_default])
 	gs.resolve_conquest_battle(true)
 	ok(gs.conquest_secured.has(defended), "winning the defense secures the territory")
 	ok(not gs.has_enemy_counter(), "enemy counter consumed after defense")

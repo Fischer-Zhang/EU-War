@@ -112,10 +112,24 @@ func resolve_player_faction(scenario: Dictionary) -> String:
 		for f in facs:
 			if String(f.get("id", "")) == player_faction_override:
 				return player_faction_override
+	# The scenario's default protagonist side (controller "player", else index 0).
+	var default_id := String(facs[0].get("id", ""))
 	for f in facs:
 		if String(f.get("controller", "")) == "player":
-			return String(f.get("id", ""))
-	return String(facs[0].get("id", ""))
+			default_id = String(f.get("id", ""))
+			break
+	# Conquest defence mirrors the sides: when the enemy counter-attacks a
+	# territory you hold, you command the OTHER faction, so defending plays as the
+	# reverse of the attack that took it — you hold the ground the AI now storms
+	# (or sally against its garrison). A fresh battle on the same map, not a
+	# replay. Roster/fortify/posture all key off resolve_player_faction, so they
+	# follow the swap automatically (the "player defensive -> AI aggressive" flip
+	# in battle.gd then makes the AI assault when you man the defensive side).
+	if in_conquest() and bool(conquest_battle.get("defense", false)):
+		for f in facs:
+			if String(f.get("id", "")) != default_id:
+				return String(f.get("id", ""))
+	return default_id
 
 func in_campaign() -> bool:
 	return campaign_id != ""

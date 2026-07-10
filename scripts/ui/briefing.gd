@@ -59,10 +59,29 @@ func _campaign_header() -> String:
 	return "[b]戰役:%s[/b]  第 %d / %d 場\n\n" % [
 		String(camp.get("title", "")), GameState.campaign_index + 1, total]
 
+func _conquest_header(scenario: Dictionary) -> String:
+	if not GameState.in_conquest():
+		return ""
+	var defending: bool = bool(GameState.conquest_battle.get("defense", false))
+	var you := GameState.resolve_player_faction(scenario)
+	var you_name := you
+	for f in scenario.get("factions", []):
+		if String(f.get("id", "")) == you:
+			you_name = String(f.get("name", you))
+			break
+	# On a defence the sides are mirrored: you command the scenario's OTHER faction,
+	# so the briefing prose (written from the protagonist's view) may not match your
+	# role — spell out which side you hold.
+	if defending:
+		return "[b][color=#e0993f]敵軍反攻——你指揮「%s」據守此地(攻守鏡像)。[/color][/b]\n\n" % you_name
+	return "[b][color=#7fd08f]進攻——你指揮「%s」奪取此地。[/color][/b]\n\n" % you_name
+
 func _compose(scenario: Dictionary) -> String:
 	var lines := []
 	if GameState.in_campaign():
 		lines.append(_campaign_header())
+	elif GameState.in_conquest():
+		lines.append(_conquest_header(scenario))
 	lines.append(String(scenario.get("briefing", "")))
 	lines.append("")
 	# Faction order of battle.
