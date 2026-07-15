@@ -136,5 +136,34 @@
     "applies_to": ["heavy_cavalry", "musketeers"],
     "attack_bonus": 3,
     "description_zh": "瑞典少年王,猛烈的騎兵與火槍突擊。"
+  },
+  "oliver_cromwell": {
+    "name_zh": "克倫威爾",
+    "nation_zh": "英格蘭議會",
+    "quality": "gold",
+    "era": "英國內戰",
+    "applies_to": ["heavy_cavalry", "light_cavalry"],
+    "attack_bonus": 2,
+    "defense_bonus": 1,
+    "description_zh": "鐵騎軍統帥,紀律嚴明的騎兵衝鋒後能收束再戰,攻守兼備。"
+  },
+  "prince_rupert": {
+    "name_zh": "魯珀特親王",
+    "nation_zh": "英格蘭保皇黨",
+    "quality": "gold",
+    "era": "英國內戰",
+    "applies_to": ["heavy_cavalry"],
+    "attack_bonus": 3,
+    "description_zh": "保皇黨騎兵統帥,衝鋒兇猛無匹,惟常追擊過度。"
+  },
+  "thomas_fairfax": {
+    "name_zh": "費爾法克斯",
+    "nation_zh": "英格蘭議會",
+    "quality": "silver",
+    "era": "英國內戰",
+    "applies_to": ["musketeers", "pikemen"],
+    "attack_bonus": 1,
+    "defense_bonus": 1,
+    "description_zh": "新模範軍統帥,火槍與長矛陣線堅實。"
   }
 }
