@@ -211,13 +211,21 @@ func _run() -> void:
 	ok(players == slot_count, "conquest battle fields the full force (veterans + replenished recruits)")
 	ok(vets == 2, "2 veterans carried into the conquest battle")
 
-	# --- Map builds (on the real default conquest too) ---
+	# --- Map builds + drives (on the real default conquest too) ---
 	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()
 	root.add_child(map)
 	await process_frame
 	await process_frame
 	ok(map.get_child_count() > 0, "conquest map builds nodes")
+	ok(map.get_node("HUD").get_child_count() > 0, "conquest HUD builds controls")
+	map._on_territory_clicked("normandy")
+	await process_frame
+	ok(map.selected_id == "normandy", "clicking a territory selects it")
+	var round0 = gs.conquest_round
+	map._end_turn()
+	await process_frame
+	ok(gs.conquest_round == round0 + 1, "End Turn advances the strategic round")
 	map.queue_free()
 	await process_frame
 
