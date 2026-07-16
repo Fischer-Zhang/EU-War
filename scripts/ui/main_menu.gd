@@ -87,8 +87,9 @@ func _on_campaign_pressed() -> void:
 
 func _on_conquest_pressed() -> void:
 	GameState.clear_campaign()
-	# One conquest for now — start it directly and open the strategic map.
-	GameState.start_conquest(String(DataLoader.conquests.keys()[0]))
+	# The grand multi-power Europe map is the default conquest.
+	var qid := "grand_europe" if DataLoader.conquests.has("grand_europe") else String(DataLoader.conquests.keys()[0])
+	GameState.start_conquest(qid)
 	get_tree().change_scene_to_file("res://scenes/conquest_map.tscn")
 
 func _on_quit_pressed() -> void:

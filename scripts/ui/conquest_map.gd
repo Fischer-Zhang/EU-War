@@ -134,13 +134,13 @@ func _build_standings(pos: Vector2) -> void:
 		var pid := String(p.get("id", ""))
 		var info: Dictionary = pcounts.get(pid, {})
 		var elim: bool = bool(info.get("eliminated", false))
-		var chip := _label("■ %s %d地/%d城%s" % [
+		var chip := _label("%s %d/%d%s" % [
 			String(p.get("name", pid)), int(info.get("territories", 0)),
-			int(info.get("cities", 0)), ("(亡)" if elim else "")],
+			int(info.get("cities", 0)), ("✗" if elim else "")],
 			Vector2(x, pos.y), 14)
 		var col := Color(String(p.get("color", "#888888")))
 		chip.modulate = col.darkened(0.4) if elim else col
-		x += 180.0
+		x += 128.0
 
 func _build_round_log(pos: Vector2) -> void:
 	var log_lines: Array = GameState.conquest_last_round_log
