@@ -1195,13 +1195,17 @@ func _end_battle(w: String) -> void:
 			lines.append("再接再厲——可重試本場。")
 	elif GameState.in_conquest():
 		lines.append("")
-		if conq_defense:
+		if GameState.conquest_lost():
+			lines.append("[color=#c0392b]帝國覆滅——你失去了所有城市。[/color]")
+		elif GameState.conquest_won():
+			lines.append("[color=#e0c060]征服完成——你成為最後屹立的強權,一統歐陸![/color]")
+		elif conq_defense:
 			lines.append("[color=#e0c060]成功守住領地——已鞏固![/color]" if player_won else "領地失守,被敵軍奪回。")
 		elif player_won:
-			lines.append("[color=#e0c060]征服完成——全境臣服![/color]" if GameState.conquest_won() else "[color=#e0c060]已佔領該領地![/color]")
+			lines.append("[color=#e0c060]已佔領該領地![/color]")
 		else:
 			lines.append("進攻受挫——可重整後再攻。")
-		if GameState.has_enemy_counter():
+		if GameState.has_enemy_counter() and not GameState.conquest_over():
 			lines.append("⚠ 敵軍正反攻你的前線——返回地圖迎戰。")
 	result_summary.text = "\n".join(lines)
 	menu_button.text = _result_button_text(player_won)

@@ -27,6 +27,14 @@ func _ready() -> void:
 	camera.view_rect = usable
 	camera.fit_world_rect(cr, usable, 1.0)
 	camera.set_content_rect(cr, 140.0)
+	# Returning from a battle: re-focus and select the territory just fought over.
+	if GameState.conquest_last_fought != "":
+		var t := GameState.conquest_territory(GameState.conquest_last_fought)
+		if not t.is_empty():
+			selected_id = GameState.conquest_last_fought
+			camera.focus_on(map_layer.world_pos(t))
+			camera.clamp_to_content()
+		GameState.conquest_last_fought = ""
 	_refresh()
 
 func _on_territory_clicked(tid: String) -> void:

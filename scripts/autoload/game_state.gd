@@ -342,6 +342,7 @@ var conquest_player_attacked: bool = false  # one player attack per round
 var conquest_treasury: Dictionary = {}    # AI power id -> strength
 var conquest_power_army: Dictionary = {}  # AI power id -> army level (feeds auto-resolve)
 var conquest_last_round_log: Array = []   # [{power, kind, territory, won}] for the round report
+var conquest_last_fought: String = ""     # territory of the last tactical battle (map re-focus)
 const NEUTRAL := "neutral"
 # Strategic economy: owned territories earn strength each round, spent on a
 # global army level (+attack in battles), fortifying frontier regions (defenders
@@ -396,6 +397,7 @@ func start_conquest(id: String) -> void:
 	conquest_treasury = {}
 	conquest_power_army = {}
 	conquest_last_round_log = []
+	conquest_last_fought = ""
 	conquest_strength = CONQ_START_STRENGTH
 	conquest_fortify = {}
 	conquest_army = 0
@@ -425,6 +427,7 @@ func clear_conquest() -> void:
 	conquest_treasury = {}
 	conquest_power_army = {}
 	conquest_last_round_log = []
+	conquest_last_fought = ""
 	conquest_strength = 0
 	conquest_fortify = {}
 	conquest_army = 0
@@ -751,6 +754,7 @@ func resolve_conquest_battle(player_won: bool) -> void:
 	conquest_prep = {}   # pre-battle preparations are spent by the fought battle
 	if tid == "":
 		return
+	conquest_last_fought = tid
 	var conqueror := ""
 	if defense:
 		if not conquest_defense_queue.is_empty():
