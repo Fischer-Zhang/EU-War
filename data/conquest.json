@@ -1,15 +1,37 @@
 {
   "continental": {
     "title": "征服:歐陸攻略",
-    "description": "從本土出發,沿前線併吞敵方領地。只能攻擊與己方領地相鄰的敵territory;每塊領地由一場歷史會戰決定歸屬,打贏即佔領。南北兩路並進,最終會師拿下敵方核心「低地」。佔領全部敵方領地即獲勝;戰敗不丟地,可重整再戰。",
-    "victory": "eliminate",
+    "description": "從本土出發,沿前線併吞敵方領地。只能攻擊與己方領地相鄰的敵領地;每塊領地由一場歷史會戰決定歸屬,打贏即佔領。城市是補給點與判負依據,資源點提供國力。奪下敵方所有城市即獲勝;失去所有城市則覆滅。",
+    "recruit_unit": "musketeers",
+    "powers": [
+      { "id": "player", "name": "玩家", "color": "#2a6fb0", "controller": "player" },
+      { "id": "enemy",  "name": "敵方", "color": "#b03030", "controller": "ai" }
+    ],
     "territories": [
-      { "id": "home",       "name": "本土",   "owner": "player", "x": 0.10, "y": 0.50, "scenario": "", "links": ["normandy", "lombardy"] },
-      { "id": "normandy",   "name": "諾曼第", "owner": "enemy",  "x": 0.34, "y": 0.24, "scenario": "02_crecy_1346",       "links": ["home", "picardy"] },
-      { "id": "picardy",    "name": "皮卡第", "owner": "enemy",  "x": 0.60, "y": 0.20, "scenario": "03_agincourt_1415",   "links": ["normandy", "lowlands"] },
-      { "id": "lombardy",   "name": "倫巴底", "owner": "enemy",  "x": 0.34, "y": 0.76, "scenario": "04_marignano_1515",   "links": ["home", "rhineland"] },
-      { "id": "rhineland",  "name": "萊茵",   "owner": "enemy",  "x": 0.60, "y": 0.80, "scenario": "06_breitenfeld_1631", "links": ["lombardy", "lowlands"] },
-      { "id": "lowlands",   "name": "低地",   "owner": "enemy",  "x": 0.86, "y": 0.50, "scenario": "08_blenheim_1704",     "links": ["picardy", "rhineland"] }
+      { "id": "home",       "name": "本土",   "owner": "player", "type": "city",     "x": 0.10, "y": 0.50, "scenario": "", "links": ["normandy", "lombardy"] },
+      { "id": "normandy",   "name": "諾曼第", "owner": "enemy",  "type": "city",     "x": 0.34, "y": 0.24, "scenario": "02_crecy_1346",       "links": ["home", "picardy"] },
+      { "id": "picardy",    "name": "皮卡第", "owner": "enemy",  "type": "resource", "yield": 2, "x": 0.60, "y": 0.20, "scenario": "03_agincourt_1415",   "links": ["normandy", "lowlands"] },
+      { "id": "lombardy",   "name": "倫巴底", "owner": "enemy",  "type": "city",     "x": 0.34, "y": 0.76, "scenario": "04_marignano_1515",   "links": ["home", "rhineland"] },
+      { "id": "rhineland",  "name": "萊茵",   "owner": "enemy",  "type": "resource", "yield": 2, "x": 0.60, "y": 0.80, "scenario": "06_breitenfeld_1631", "links": ["lombardy", "lowlands"] },
+      { "id": "lowlands",   "name": "低地",   "owner": "enemy",  "type": "city",     "x": 0.86, "y": 0.50, "scenario": "08_blenheim_1704",     "links": ["picardy", "rhineland"] }
+    ]
+  },
+  "test_arena": {
+    "title": "測試競技場",
+    "description": "多勢力引擎的確定性測試地圖(藍=玩家,紅、綠=AI)。",
+    "recruit_unit": "musketeers",
+    "powers": [
+      { "id": "blue",  "name": "藍", "color": "#2a6fb0", "controller": "player" },
+      { "id": "red",   "name": "紅", "color": "#b03030", "controller": "ai" },
+      { "id": "green", "name": "綠", "color": "#2e8b57", "controller": "ai" }
+    ],
+    "territories": [
+      { "id": "b_cap",  "name": "藍都", "owner": "blue",  "type": "city",     "x": 0.15, "y": 0.50, "scenario": "02_crecy_1346", "links": ["b_mine", "r_cap"] },
+      { "id": "b_mine", "name": "藍礦", "owner": "blue",  "type": "resource", "yield": 2, "x": 0.05, "y": 0.50, "scenario": "02_crecy_1346", "links": ["b_cap"] },
+      { "id": "r_cap",  "name": "紅都", "owner": "red",   "type": "city",     "x": 0.50, "y": 0.35, "scenario": "02_crecy_1346", "links": ["b_cap", "r_mine", "g_cap"] },
+      { "id": "r_mine", "name": "紅礦", "owner": "red",   "type": "resource", "yield": 2, "x": 0.50, "y": 0.10, "scenario": "02_crecy_1346", "links": ["r_cap"] },
+      { "id": "g_cap",  "name": "綠都", "owner": "green", "type": "city",     "x": 0.85, "y": 0.50, "scenario": "02_crecy_1346", "links": ["r_cap", "g_mine"] },
+      { "id": "g_mine", "name": "綠礦", "owner": "green", "type": "resource", "yield": 2, "x": 0.95, "y": 0.50, "scenario": "02_crecy_1346", "links": ["g_cap"] }
     ]
   }
 }

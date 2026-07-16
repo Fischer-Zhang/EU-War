@@ -1,10 +1,11 @@
 extends SceneTree
 
-# Verifies the conquest strategic layer incl. the enemy counter-attack loop:
-# starting ownership, the frontline attack rule, capture-on-win, the enemy
-# queueing a counter after the player's attack, defending (win secures, loss
-# loses the territory), the "secured" rule preventing repeat counters, the win
-# condition, and the map screen build.
+# Verifies the MULTI-FACTION conquest strategic layer:
+# power roster + owner-by-power, per-power supply/income, deterministic
+# auto-resolution, the AI round loop, the player defence queue (side-swap
+# mirror), elimination + inheritance, sole-survivor victory and lost-all-cities
+# defeat, recruit/heal at a supplied city, roster carry, the real-battle
+# conquest bonuses, and the map screen build. Driven by the fixed "test_arena".
 
 var fails := 0
 
@@ -36,135 +37,128 @@ func _first_attackable(gs) -> String:
 			return tid
 	return ""
 
+func _owners_snapshot(gs) -> String:
+	var parts := []
+	for t in gs.conquest_territories():
+		var tid := String(t.get("id", ""))
+		parts.append(tid + "=" + String(gs.conquest_owner.get(tid, "")))
+	return ", ".join(parts)
+
 func _run() -> void:
 	var gs = root.get_node("GameState")
 	var dl = root.get_node("DataLoader")
 	await process_frame
 
-	var qid = String(dl.conquests.keys()[0])
+	var qid = "test_arena"
+
+	# --- Setup / power roster ---
 	gs.start_conquest(qid)
 	ok(gs.in_conquest(), "in_conquest() after start")
-	ok(gs.conquest_owner.get("home", "") == "player", "home starts player-owned")
-	ok(not gs.conquest_won(), "not won at start")
-	ok(not gs.has_enemy_counter(), "no enemy counter at start")
+	ok(gs.player_power_id == "blue", "player power resolves to blue")
+	ok(gs.conquest_powers.size() == 3, "three powers loaded")
+	ok(String(gs.conquest_owner.get("b_cap", "")) == "blue", "b_cap starts blue")
+	ok(String(gs.conquest_owner.get("r_cap", "")) == "red", "r_cap starts red")
+	ok(not gs.conquest_over() and not gs.conquest_won() and not gs.conquest_lost(), "no result at start")
+	var pc0 = gs.conquest_power_counts()
+	ok(int(pc0["blue"]["cities"]) == 1 and int(pc0["red"]["cities"]) == 1, "each power starts with one city")
 
-	# Frontline + refusing a deep target.
-	ok(gs.territory_attackable("normandy") and gs.territory_attackable("lombardy"), "initial frontline = normandy + lombardy")
-	ok(not gs.territory_attackable("lowlands"), "deep enemy territory not attackable")
-	ok(not gs.begin_conquest_attack("lowlands"), "attacking a non-frontline territory refused")
+	# --- Per-power supply + income ---
+	var bsup = gs.conquest_supplied_for("blue")
+	ok(bsup.has("b_cap") and bsup.has("b_mine"), "blue city supplies its linked resource")
+	ok(gs.conquest_income_for("blue") == 3, "blue income = city base(1) + mine yield(2)")
+	ok(gs.conquest_income() == gs.conquest_income_for("blue"), "conquest_income() aliases the player power")
+	ok(gs.conquest_income_for("red") == 3, "red earns its own supplied income")
+	# An owned resource with no chain back to an owning city is unsupplied.
+	gs.conquest_owner["r_mine"] = "blue"   # r_mine links only r_cap (still red) -> island for blue
+	ok(not gs.conquest_supplied_for("blue").has("r_mine"), "an isolated resource is unsupplied")
+	ok(gs.conquest_income_for("blue") == 3, "a cut-off resource yields no income")
 
-	# Backing out of a set-up attack (briefing "back") abandons the battle but
-	# keeps the campaign — ownership unchanged, no counter queued, still attackable.
-	ok(gs.begin_conquest_attack("normandy"), "begin attack (to cancel)")
-	gs.cancel_conquest_battle()
-	ok(gs.conquest_battle.is_empty(), "cancel clears the pending battle")
-	ok(gs.in_conquest(), "cancel keeps the conquest campaign")
-	ok(gs.conquest_owner.get("normandy", "") == "enemy", "cancelled attack leaves ownership unchanged")
-	ok(not gs.has_enemy_counter(), "cancelled attack queues no counter")
-	ok(gs.territory_attackable("normandy"), "normandy still attackable after cancel")
-
-	# Attack normandy and win -> captured, and the enemy queues a counter.
-	ok(gs.begin_conquest_attack("normandy"), "begin attack on normandy")
+	# --- Player attack + elimination + inheritance ---
+	gs.start_conquest(qid)
+	ok(gs.territory_attackable("r_cap"), "player can attack an adjacent supplied enemy city")
+	ok(not gs.territory_attackable("g_cap"), "cannot attack a non-adjacent power")
+	ok(not gs.territory_attackable("r_mine"), "cannot attack an enemy node with no supplied-blue neighbour")
+	ok(gs.begin_conquest_attack("r_cap"), "begin attack on r_cap")
+	ok(String(gs.conquest_battle.get("attacker", "")) == "blue" and String(gs.conquest_battle.get("defender", "")) == "red",
+		"battle records attacker=blue defender=red")
 	ok(gs.current_scenario_id == "02_crecy_1346", "battle scenario = territory's scenario")
-	# Attacking plays the scenario's default protagonist side.
-	var ascen = dl.get_scenario(gs.current_scenario_id)
-	var atk_side = gs.resolve_player_faction(ascen)
-	ok(atk_side == String(ascen.get("factions", [])[0].get("id", "")),
-		"attacking plays the scenario's default side (%s)" % atk_side)
 	gs.resolve_conquest_battle(true)
-	ok(gs.conquest_owner.get("normandy", "") == "player", "normandy captured on win")
-	ok(gs.has_enemy_counter(), "enemy queues a counter-attack after the player's attack")
+	ok(String(gs.conquest_owner.get("r_cap", "")) == "blue", "winning captures the city")
+	ok(gs.conquest_player_attacked, "player-attacked flag set")
+	ok(gs._is_eliminated("red"), "a power reduced to zero cities is eliminated")
+	ok(String(gs.conquest_owner.get("r_mine", "")) == "blue", "eliminated power's resources pass to the conqueror")
+	ok(not gs.begin_conquest_attack("g_cap"), "cannot attack twice in one round")
 
-	# While a counter is pending, the player can't launch a new attack.
-	ok(not gs.begin_conquest_attack("lombardy"), "can't attack while defending a counter")
+	# --- Deterministic auto-resolution ---
+	# Equal-strength attacker vs defender: the defender's edge means ties hold.
+	gs.start_conquest(qid)
+	ok(not gs._auto_resolve("green", "r_cap"), "a non-adjacent equal power fails to take a city (ties favour defender)")
+	ok(String(gs.conquest_owner.get("r_cap", "")) == "red", "failed auto-resolve leaves ownership unchanged")
+	# Two fresh runs of the same round produce identical ownership.
+	gs.start_conquest(qid)
+	gs.advance_conquest_round()
+	var snap1 := _owners_snapshot(gs)
+	gs.start_conquest(qid)
+	gs.advance_conquest_round()
+	var snap2 := _owners_snapshot(gs)
+	ok(snap1 == snap2, "auto-resolution is deterministic across runs")
 
-	# Defend and win -> the territory is secured; enemy turn is spent.
-	ok(gs.begin_conquest_defense(), "begin defense of the counter-attacked territory")
-	var defended = String(gs.conquest_battle.get("territory", ""))
-	# Mirror布陣: defending a territory swaps you to the scenario's OTHER faction,
-	# so the fight is the reverse of the attack that took it — not a replay.
+	# --- AI round loop + player defence queue + side-swap mirror + defeat ---
+	gs.start_conquest(qid)
+	gs.conquest_power_army["red"] = 5           # a strong red will assault the player
+	ok(gs.advance_conquest_round(), "round advances when no defence pending")
+	var pend: Array = gs.conquest_pending_defenses()
+	ok(pend.size() >= 1, "a strong AI queues an attack on the player")
+	ok(String(pend[0].get("attacker", "")) == "red" and String(pend[0].get("territory", "")) == "b_cap",
+		"queued defence is red -> b_cap")
+	ok(not gs.advance_conquest_round(), "cannot advance the round while a defence is pending")
+	ok(gs.begin_conquest_defense(), "player begins the queued defence")
+	ok(bool(gs.conquest_battle.get("defense", false)) and String(gs.conquest_battle.get("attacker", "")) == "red",
+		"defence battle records the real AI attacker")
 	var dscen = dl.get_scenario(gs.current_scenario_id)
 	var def_side = gs.resolve_player_faction(dscen)
-	var dscen_default = String(dscen.get("factions", [])[0].get("id", ""))
-	ok(def_side != "" and def_side != dscen_default,
-		"defending mirrors sides: player commands the non-default faction (%s, default %s)" % [def_side, dscen_default])
-	gs.resolve_conquest_battle(true)
-	ok(gs.conquest_secured.has(defended), "winning the defense secures the territory")
-	ok(not gs.has_enemy_counter(), "enemy counter consumed after defense")
-	ok(gs.conquest_owner.get(defended, "") == "player", "defended territory stays player-owned")
+	ok(def_side != String(dscen.get("factions", [])[0].get("id", "")), "defence mirrors sides (player commands the other faction)")
+	gs.resolve_conquest_battle(false)          # lose the last city
+	ok(String(gs.conquest_owner.get("b_cap", "")) == "red", "losing the defence hands the city to the attacker")
+	ok(gs.conquest_lost() and gs.conquest_over(), "losing the last city is defeat")
 
-	# A secured territory is not counter-attacked again.
-	# Capture the next frontier, then check the enemy doesn't re-target the secured one.
-	var nxt = _first_attackable(gs)
-	ok(nxt != "", "a new frontier opened after securing")
-	gs.begin_conquest_attack(nxt)
-	gs.resolve_conquest_battle(true)
-	ok(gs.conquest_enemy_target != defended, "enemy does not re-attack a secured territory")
-
-	# Losing a defense loses the territory.
-	if gs.has_enemy_counter():
-		var t2 = gs.conquest_enemy_target
-		gs.begin_conquest_defense()
-		gs.resolve_conquest_battle(false)
-		ok(gs.conquest_owner.get(t2, "") == "enemy", "losing the defense hands the territory back")
-
-	# Perfect-player playthrough terminates in a win (securing prevents loops).
+	# --- Sole-survivor victory (perfect player) ---
 	gs.start_conquest(qid)
 	var steps = 0
-	while not gs.conquest_won() and steps < 60:
+	while not gs.conquest_over() and steps < 60:
 		steps += 1
 		if gs.has_enemy_counter():
 			gs.begin_conquest_defense()
-			gs.resolve_conquest_battle(true)
+			gs.resolve_conquest_battle(true)     # hold every counter
+			continue
+		var tgt = _first_attackable(gs)
+		if tgt != "":
+			gs.begin_conquest_attack(tgt)
+			gs.resolve_conquest_battle(true)     # win every assault
 		else:
-			var tid = _first_attackable(gs)
-			if tid == "":
-				break
-			gs.begin_conquest_attack(tid)
-			gs.resolve_conquest_battle(true)
-	ok(gs.conquest_won(), "a perfect player conquers everything (in %d steps)" % steps)
+			gs.advance_conquest_round()
+	ok(gs.conquest_won(), "a perfect player becomes the sole surviving power (in %d steps)" % steps)
 
-	# --- Economy: income, muster, fortify, and battle bonuses ---
+	# --- Recruit / heal at a supplied city ---
 	gs.start_conquest(qid)
-	ok(gs.conquest_strength == gs.CONQ_START_STRENGTH, "starts with seed strength")
-	ok(gs.conquest_army == 0, "army level starts at 0")
-	ok(not gs.can_fortify("home"), "home (no battle) can't be fortified")
-
 	gs.conquest_strength = 20
-	gs.begin_conquest_attack("normandy")
-	gs.resolve_conquest_battle(true)   # capture normandy; a round passes -> income
-	ok(gs.conquest_strength > 20, "strength grows from income after a round (%d)" % gs.conquest_strength)
-	ok(gs.can_fortify("normandy"), "a captured frontier region can be fortified")
-	var before = gs.conquest_strength
-	ok(gs.fortify("normandy"), "fortify succeeds")
-	ok(gs.conquest_fortify_level("normandy") == 1 and gs.conquest_strength == before - gs.CONQ_FORTIFY_COST, "fortify raises level and spends strength")
-	ok(gs.muster(), "muster succeeds")
-	ok(gs.conquest_army == 1, "muster raises army level")
+	ok(gs.conquest_has_supplied_city(), "player holds a supplied city")
+	var r0 = gs.conquest_roster.size()
+	ok(gs.recruit(), "recruit succeeds at a supplied city")
+	ok(gs.conquest_roster.size() == r0 + 1, "recruit adds a veteran to the roster")
+	ok(gs.heal(), "heal reinforces the weakest roster unit")
+	ok(int(gs.conquest_roster[gs._lowest_rank_idx()].get("rank", 0)) >= 1, "heal raised a rank")
+	gs.conquest_owner["b_cap"] = "red"          # strip the player's only city
+	ok(not gs.conquest_has_supplied_city(), "no supplied city after losing all cities")
+	ok(not gs.can_recruit() and not gs.can_heal(), "cannot recruit/heal without a supplied city")
 
-	# Development tracks: industry lifts income, training banks a head start.
-	gs.conquest_strength = 20
-	var inc_before = gs.conquest_income()
-	ok(gs.develop("industry"), "develop industry succeeds")
-	ok(gs.conquest_industry == 1 and gs.conquest_income() == inc_before + 1, "industry raises income")
-	ok(gs.develop("training"), "develop training succeeds")
-	ok(gs.conquest_training == 1, "training level raised")
-	ok(not gs.can_develop("training") or gs.conquest_training < gs.CONQ_TRAINING_MAX, "training respects its cap")
-
-	# Pre-battle preparations: cost strength, one-shot, no double-buy.
-	var s_before = gs.conquest_strength
-	ok(gs.prepare("barrage"), "buy barrage prep")
-	ok(gs.prep_active("barrage") and gs.conquest_strength == s_before - int(gs.CONQ_PREP_COST["barrage"]),
-		"prep spends strength and becomes active")
-	ok(not gs.prepare("barrage"), "cannot buy the same prep twice")
-
-	# Battle bonuses: defending a fortified region entrenches units, the army
-	# level adds attack, training banks XP, and a barrage prep softens the enemy —
-	# verify on real units in a conquest defense battle.
+	# --- Real-battle conquest bonuses (army/fortify/training/barrage), multi-power ---
+	gs.start_conquest(qid)
 	gs.conquest_army = 2
-	gs.conquest_fortify["normandy"] = 2
+	gs.conquest_fortify["b_cap"] = 2
 	gs.conquest_training = 1
 	gs.conquest_prep = {"barrage": true}
-	gs.conquest_enemy_target = "normandy"
+	gs.conquest_defense_queue = [{"attacker": "red", "territory": "b_cap"}]
 	gs.begin_conquest_defense()
 	var b = load("res://scenes/battle.tscn").instantiate()
 	root.add_child(b)
@@ -187,30 +181,9 @@ func _run() -> void:
 	ok(has_army_buff, "army level adds attack to player units")
 	ok(sample != null and sample.xp >= gs.CONQ_TRAIN_XP, "training grants start XP (xp %d)" % (sample.xp if sample else -1))
 	ok(enemy_sample != null and (enemy_sample.suppression > 0 or enemy_sample.hp < enemy_sample.max_hp),
-		"barrage prep softens the enemy (supp %d, hp %d/%d)" % [
-			enemy_sample.suppression if enemy_sample else -1,
-			enemy_sample.hp if enemy_sample else -1,
-			enemy_sample.max_hp if enemy_sample else -1])
+		"barrage prep softens the enemy")
 	b.queue_free()
 	await process_frame
-
-	# --- Supply network: a territory cut off from the homeland yields no income
-	# and can't stage offensives or be fortified. ---
-	gs.start_conquest(qid)
-	gs.conquest_owner["normandy"] = "player"   # home - normandy - picardy contiguous chain
-	gs.conquest_owner["picardy"] = "player"
-	var sup1: Dictionary = gs.conquest_supplied()
-	ok(sup1.has("home") and sup1.has("normandy") and sup1.has("picardy"), "a contiguous chain is fully supplied")
-	ok(gs.conquest_income() == 3 + gs.conquest_industry, "income counts all supplied territories (3)")
-	# The enemy retakes the middle link (normandy) — picardy is now cut off.
-	gs.conquest_owner["normandy"] = "enemy"
-	var sup2: Dictionary = gs.conquest_supplied()
-	ok(sup2.has("home") and not sup2.has("picardy"), "losing the link cuts off the forward territory")
-	ok(not gs.territory_supplied("picardy"), "territory_supplied() false for the cut-off pocket")
-	ok(gs.conquest_income() == 1 + gs.conquest_industry, "a cut-off territory yields no income (only home)")
-	ok(not gs.can_fortify("picardy"), "cannot fortify a cut-off territory")
-	ok(not gs.territory_attackable("lowlands"), "cannot stage an attack from a cut-off pocket")
-	ok(gs.territory_attackable("normandy"), "can still attack to reconnect the severed link")
 
 	# --- Conquest roster: veterans carry between conquest battles ---
 	gs.start_conquest(qid)
@@ -218,13 +191,10 @@ func _run() -> void:
 	gs.capture_roster([FakeUnit.new("longbowmen", 6, 2), FakeUnit.new("men_at_arms", 3, 1)])
 	ok(gs.conquest_roster.size() == 2 and gs.campaign_roster.is_empty(),
 		"capturing in conquest fills the conquest roster, not the campaign one")
-	# Applying it to a conquest scenario overlays veterans and replenishes the rest.
-	var terr: Dictionary = gs.conquest_territory("normandy")
+	var terr: Dictionary = gs.conquest_territory("b_cap")
 	var cs: Dictionary = dl.get_scenario(String(terr.get("scenario", "")))
-	var pf2 := ""
-	for f in cs.get("factions", []):
-		if f.get("controller") == "player":
-			pf2 = String(f.get("id", ""))
+	# In conquest an ATTACK plays the scenario's default side; roster fills that side.
+	var pf2: String = gs.resolve_player_faction(cs)
 	var slot_count := 0
 	for u in cs.get("units", []):
 		if String(u.get("faction", "")) == pf2:
@@ -241,8 +211,8 @@ func _run() -> void:
 	ok(players == slot_count, "conquest battle fields the full force (veterans + replenished recruits)")
 	ok(vets == 2, "2 veterans carried into the conquest battle")
 
-	# Map builds.
-	gs.start_conquest(qid)
+	# --- Map builds (on the real default conquest too) ---
+	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()
 	root.add_child(map)
 	await process_frame

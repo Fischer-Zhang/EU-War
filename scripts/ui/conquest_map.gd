@@ -28,7 +28,17 @@ func _ready() -> void:
 
 	var conq := DataLoader.get_conquest(GameState.conquest_id)
 	var counts := GameState.conquest_counts()
-	var under_attack := GameState.conquest_enemy_target
+	# Pending AI attacks on the player this round (there may be several).
+	var pending: Array = GameState.conquest_pending_defenses()
+	var under_set := {}
+	for e in pending:
+		var etid := String(e.get("territory", ""))
+		if String(GameState.conquest_owner.get(etid, "")) == GameState.player_power_id:
+			under_set[etid] = true
+	var under_attack := ""
+	for k in under_set:
+		under_attack = String(k)
+		break
 
 	var title := Label.new()
 	title.text = String(conq.get("title", "征服"))
@@ -42,11 +52,14 @@ func _ready() -> void:
 	if GameState.conquest_won():
 		status.text = "征服完成!全境已納入版圖。"
 		status.modulate = Color(0.5, 0.9, 0.5)
+	elif GameState.conquest_lost():
+		status.text = "帝國覆滅——你失去了所有城市。返回主選單重整旗鼓。"
+		status.modulate = Color(0.95, 0.4, 0.4)
 	elif under_attack != "":
-		status.text = "⚠ 敵軍反攻「%s」!點擊該地迎戰防守。" % String(GameState.conquest_territory(under_attack).get("name", under_attack))
+		status.text = "⚠ 敵軍反攻「%s」!點擊該地迎戰防守(可能有多處)。" % String(GameState.conquest_territory(under_attack).get("name", under_attack))
 		status.modulate = Color(0.95, 0.6, 0.35)
 	else:
-		status.text = "已佔領 %d / %d — 點金色前線進攻,或點己方領地設防。綠線為補給線,斷補領地不產國力。" % [counts.player, counts.total]
+		status.text = "已佔領 %d / %d(城市 %d)— 點金色前線進攻,點己方城市設防,或按「結束回合 ▶」讓列強行動。綠線為補給線。" % [counts.player, counts.total, int(counts.get("player_cities", 0))]
 	add_child(status)
 
 	# Economy header.
@@ -66,7 +79,9 @@ func _ready() -> void:
 		busy or not GameState.can_develop("industry"), _develop.bind("industry"))
 	_econ_button("訓練所 老兵 (費%d)" % GameState.CONQ_TRAINING_COST, Vector2(400, 108), Vector2(180, 30),
 		busy or not GameState.can_develop("training"), _develop.bind("training"))
-	_econ_button("返回主選單", Vector2(586, 108), Vector2(130, 30), false, func():
+	_econ_button("結束回合 ▶", Vector2(586, 108), Vector2(140, 30),
+		busy or GameState.conquest_over(), _end_turn)
+	_econ_button("返回主選單", Vector2(738, 108), Vector2(130, 30), false, func():
 		GameState.clear_conquest()
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
 
@@ -120,8 +135,8 @@ func _ready() -> void:
 
 	for t in terrs:
 		var tid := String(t.get("id", ""))
-		var owner := String(GameState.conquest_owner.get(tid, "enemy"))
-		var is_defense := (tid == under_attack)
+		var owner := String(GameState.conquest_owner.get(tid, "neutral"))
+		var is_defense := under_set.has(tid)
 		var attackable := (under_attack == "") and GameState.territory_attackable(tid)
 		var can_fort := (under_attack == "") and GameState.can_fortify(tid)
 		var secured := GameState.conquest_secured.has(tid)
@@ -143,7 +158,7 @@ func _ready() -> void:
 		elif attackable:
 			label += "  ⚔"
 			col = COLOR_TARGET
-		elif owner == "player":
+		elif owner == GameState.player_power_id:
 			if not supplied.has(tid) and String(t.get("scenario", "")) != "":
 				label += "  ⛔斷補"   # cut off from supply: no income, can't stage/fortify
 				col = COLOR_CUTOFF
@@ -152,7 +167,7 @@ func _ready() -> void:
 					label += "  設防 %d" % GameState.CONQ_FORTIFY_COST
 				col = COLOR_SECURED if secured else COLOR_PLAYER
 		else:
-			col = COLOR_ENEMY
+			col = _power_color(owner)
 		btn.text = label
 
 		btn.add_theme_color_override("font_color", Color.WHITE)
@@ -209,3 +224,15 @@ func _fortify(tid: String) -> void:
 func _muster() -> void:
 	GameState.muster()
 	get_tree().reload_current_scene()
+
+func _end_turn() -> void:
+	GameState.advance_conquest_round()
+	get_tree().reload_current_scene()
+
+func _power_color(pid: String) -> Color:
+	if pid == GameState.player_power_id:
+		return COLOR_PLAYER
+	var hex := String(GameState.conquest_power(pid).get("color", ""))
+	if hex != "":
+		return Color(hex)
+	return COLOR_ENEMY

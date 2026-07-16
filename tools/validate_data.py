@@ -142,17 +142,41 @@ def main():
         ids = set(id_counts.keys())
         terr_by_id = {t.get("id"): t for t in terrs if t.get("id") in ids}
         neighbors_by_id = {tid: set() for tid in ids}
-        if not any(t.get("owner") == "player" for t in terrs):
-            errors.append(f"conquest {qid}: no player-owned starting territory")
-        if not any(t.get("owner") == "enemy" for t in terrs):
-            errors.append(f"conquest {qid}: no enemy territory to conquer")
+        # Multi-faction powers: exactly one player-controlled power; every
+        # territory owner references a defined power id (or "neutral").
+        powers = q.get("powers", [])
+        power_ids = set()
+        player_powers = []
+        for p in powers:
+            pid = p.get("id", "")
+            if not isinstance(pid, str) or pid == "":
+                errors.append(f"conquest {qid}: power missing/invalid id")
+                continue
+            power_ids.add(pid)
+            if p.get("controller") == "player":
+                player_powers.append(pid)
+        if powers and len(player_powers) != 1:
+            errors.append(f"conquest {qid}: needs exactly one player-controlled power (found {len(player_powers)})")
+        player_id = player_powers[0] if player_powers else "player"
+        valid_owners = power_ids | {"neutral"}
+        if not any(t.get("owner") == player_id for t in terrs):
+            errors.append(f"conquest {qid}: no territory owned by the player power '{player_id}'")
+        if not any(t.get("owner") not in (player_id, "neutral") for t in terrs):
+            errors.append(f"conquest {qid}: no rival-power territory to conquer")
         for t in terrs:
             tid = t.get("id")
             sid = t.get("scenario", "")
+            owner = t.get("owner", "neutral")
+            ttype = t.get("type", "city")
+            if powers and owner not in valid_owners:
+                errors.append(f"conquest {qid}: territory '{tid}' owner '{owner}' is not a defined power")
+            if ttype not in ("city", "resource"):
+                errors.append(f"conquest {qid}: territory '{tid}' invalid type '{ttype}'")
             if sid and sid not in scenario_ids:
                 errors.append(f"conquest {qid}: territory '{tid}' unknown scenario '{sid}'")
-            if t.get("owner") == "enemy" and not sid:
-                errors.append(f"conquest {qid}: enemy territory '{tid}' needs a scenario")
+            # A rival-power territory must be conquerable (needs a battle scenario).
+            if owner not in (player_id, "neutral") and not sid:
+                errors.append(f"conquest {qid}: rival territory '{tid}' needs a scenario")
             for nb in t.get("links", []):
                 if nb not in ids:
                     errors.append(f"conquest {qid}: territory '{tid}' links unknown '{nb}'")

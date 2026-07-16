@@ -323,10 +323,26 @@ func tech_mods_for(type_id: String) -> Dictionary:
 # ------------------------------------------------------------------ conquest
 
 var conquest_id: String = ""
-var conquest_owner: Dictionary = {}       # territory_id -> "player" | "enemy"
-var conquest_secured: Dictionary = {}     # territory_id -> true (held off a counter)
-var conquest_battle: Dictionary = {}      # current battle {territory, defense:bool}
-var conquest_enemy_target: String = ""    # queued enemy counter-attack to defend
+var conquest_owner: Dictionary = {}       # territory_id -> power id
+var conquest_secured: Dictionary = {}     # territory_id -> true (repelled a counter THIS round)
+var conquest_battle: Dictionary = {}      # current battle {territory, defense, attacker, defender}
+# --- Multi-faction strategic layer ---
+# The strategic map hosts several great powers; only the tactical battles stay
+# two-sided (attacker vs defender over one contested territory). One power is the
+# player; the rest are AI that expand and fight each other via deterministic
+# auto-resolution. A power reduced to zero cities is eliminated; the last power
+# standing (the player) wins, and the player losing their last city is defeat.
+var player_power_id: String = ""
+var conquest_powers: Array = []           # [{id,name,color,controller}]
+var conquest_defense_queue: Array = []    # [{attacker, territory}] AI attacks on the player
+var conquest_eliminated: Dictionary = {}  # power id -> true
+var conquest_result: String = ""          # "" | "won" | "lost"
+var conquest_round: int = 0
+var conquest_player_attacked: bool = false  # one player attack per round
+var conquest_treasury: Dictionary = {}    # AI power id -> strength
+var conquest_power_army: Dictionary = {}  # AI power id -> army level (feeds auto-resolve)
+var conquest_last_round_log: Array = []   # [{power, kind, territory, won}] for the round report
+const NEUTRAL := "neutral"
 # Strategic economy: owned territories earn strength each round, spent on a
 # global army level (+attack in battles), fortifying frontier regions (defenders
 # entrench when you hold them), development tracks (permanent army-wide edges),
@@ -346,6 +362,17 @@ const CONQ_TRAIN_XP := 3                   # start XP granted per training level
 # Pre-battle preparations (one-shot, consumed by the next battle): recon grants
 # army-wide vision, barrage softens the enemy, supply digs your troops in.
 const CONQ_PREP_COST := {"recon": 2, "barrage": 3, "supply": 2}
+# Multi-faction economy & deterministic auto-resolution tunables.
+const CONQ_CITY_BASE := 1                  # income per supplied city
+const RESOURCE_DEFAULT_YIELD := 2          # income per supplied resource node (if unspecified)
+const CONQ_RECRUIT_COST := 5               # raise a fresh veteran at a supplied city
+const CONQ_HEAL_COST := 3                  # reinforce (rank up) the weakest roster unit
+const CONQ_ROSTER_MAX := 8
+const CONQ_AI_ARMY_COST := 4
+const CONQ_AI_ARMY_MAX := 4
+const AR_W_ARMY := 1                        # auto-resolve: weight of army level
+const AR_W_FORT := 1                        # auto-resolve: weight of fortify (defender)
+const AR_W_DEFENDER := 1                    # auto-resolve: home-defence edge / tie-breaker
 var conquest_strength: int = 0
 var conquest_fortify: Dictionary = {}     # territory_id -> fortify level
 var conquest_army: int = 0
@@ -356,10 +383,19 @@ var conquest_roster: Array = []           # surviving veterans carried between c
 
 func start_conquest(id: String) -> void:
 	conquest_id = id
+	conquest_powers = _load_powers()
+	player_power_id = _find_player_power()
 	conquest_owner = {}
 	conquest_secured = {}
 	conquest_battle = {}
-	conquest_enemy_target = ""
+	conquest_defense_queue = []
+	conquest_eliminated = {}
+	conquest_result = ""
+	conquest_round = 0
+	conquest_player_attacked = false
+	conquest_treasury = {}
+	conquest_power_army = {}
+	conquest_last_round_log = []
 	conquest_strength = CONQ_START_STRENGTH
 	conquest_fortify = {}
 	conquest_army = 0
@@ -369,14 +405,26 @@ func start_conquest(id: String) -> void:
 	conquest_roster = []
 	player_faction_override = ""   # conquest uses each territory's default sides
 	for t in conquest_territories():
-		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", "enemy"))
+		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", NEUTRAL))
+	for pid in _ai_powers_in_order():
+		conquest_treasury[pid] = CONQ_START_STRENGTH
+		conquest_power_army[pid] = 0
 
 func clear_conquest() -> void:
 	conquest_id = ""
+	conquest_powers = []
+	player_power_id = ""
 	conquest_owner = {}
 	conquest_secured = {}
 	conquest_battle = {}
-	conquest_enemy_target = ""
+	conquest_defense_queue = []
+	conquest_eliminated = {}
+	conquest_result = ""
+	conquest_round = 0
+	conquest_player_attacked = false
+	conquest_treasury = {}
+	conquest_power_army = {}
+	conquest_last_round_log = []
 	conquest_strength = 0
 	conquest_fortify = {}
 	conquest_army = 0
@@ -387,6 +435,73 @@ func clear_conquest() -> void:
 
 func in_conquest() -> bool:
 	return conquest_id != ""
+
+# --- Powers (great powers on the strategic map) ---
+
+func _load_powers() -> Array:
+	var data := DataLoader.get_conquest(conquest_id)
+	var powers: Array = data.get("powers", [])
+	if not powers.is_empty():
+		return powers.duplicate(true)
+	# Back-compat: synthesize powers from the distinct owner values (legacy N-side).
+	var seen := {}
+	var out: Array = []
+	for t in data.get("territories", []):
+		var o := String(t.get("owner", ""))
+		if o == "" or o == NEUTRAL or seen.has(o):
+			continue
+		seen[o] = true
+		out.append({"id": o, "name": o, "color": "#888888",
+			"controller": ("player" if o == "player" else "ai")})
+	return out
+
+func _find_player_power() -> String:
+	for p in conquest_powers:
+		if String(p.get("controller", "")) == "player":
+			return String(p.get("id", ""))
+	return String(conquest_powers[0].get("id", "")) if not conquest_powers.is_empty() else ""
+
+func conquest_power(pid: String) -> Dictionary:
+	for p in conquest_powers:
+		if String(p.get("id", "")) == pid:
+			return p
+	return {}
+
+func power_controller(pid: String) -> String:
+	return String(conquest_power(pid).get("controller", ""))
+
+func _all_powers() -> Array:
+	var out: Array = []
+	for p in conquest_powers:
+		out.append(String(p.get("id", "")))
+	return out
+
+func _is_eliminated(pid: String) -> bool:
+	return bool(conquest_eliminated.get(pid, false))
+
+func _ai_powers_in_order() -> Array:
+	var out: Array = []
+	for pid in _all_powers():
+		if pid != player_power_id and not _is_eliminated(pid):
+			out.append(pid)
+	return out
+
+func _surviving_powers() -> Array:
+	var out: Array = []
+	for pid in _all_powers():
+		if not _is_eliminated(pid):
+			out.append(pid)
+	return out
+
+func _is_city(t: Dictionary) -> bool:
+	return String(t.get("type", "city")) == "city"
+
+func _city_count(pid: String) -> int:
+	var n := 0
+	for t in conquest_territories():
+		if String(conquest_owner.get(String(t.get("id", "")), "")) == pid and _is_city(t):
+			n += 1
+	return n
 
 func conquest_territories() -> Array:
 	return DataLoader.get_conquest(conquest_id).get("territories", [])
@@ -408,133 +523,329 @@ func _conquest_neighbors(tid: String) -> Array:
 			out[String(other.get("id", ""))] = true
 	return out.keys()
 
-func _adjacent_owned_by(tid: String, side: String) -> bool:
-	for nb in _conquest_neighbors(tid):
-		if String(conquest_owner.get(nb, "")) == side:
-			return true
-	return false
+# --- Supply network (per power) ---
+# A power's supply sources are its own CITIES (plus any territory flagged
+# "supply": true). A territory is supplied for its owner if a chain of that
+# power's territories connects it back to a source; a territory cut off (e.g. by
+# an enemy severing the chain) earns no income and can't stage offensives.
 
-# --- Supply network ---
-# A supply source is the homeland (a territory that STARTS player-owned) or any
-# territory flagged "supply": true in the data. A player territory is supplied if
-# a chain of player-owned territories connects it back to a source; a territory
-# cut off by an enemy counter-attack earns no income and can't stage offensives.
-
-func conquest_supply_sources() -> Array:
+func conquest_supply_sources_for(pid: String) -> Array:
 	var out: Array = []
 	for t in conquest_territories():
-		if bool(t.get("supply", false)) or String(t.get("owner", "")) == "player":
-			out.append(String(t.get("id", "")))
+		var tid := String(t.get("id", ""))
+		if String(conquest_owner.get(tid, "")) != pid:
+			continue
+		if _is_city(t) or bool(t.get("supply", false)):
+			out.append(tid)
 	return out
 
-# Dictionary[tid -> true] of player territories tracing supply back to a source.
-func conquest_supplied() -> Dictionary:
+# Dictionary[tid -> true] of pid's territories tracing supply back to a source.
+func conquest_supplied_for(pid: String) -> Dictionary:
 	var supplied := {}
 	var stack: Array = []
-	for tid in conquest_supply_sources():
-		if String(conquest_owner.get(tid, "")) == "player" and not supplied.has(tid):
+	for tid in conquest_supply_sources_for(pid):
+		if not supplied.has(tid):
 			supplied[tid] = true
 			stack.append(tid)
 	while not stack.is_empty():
 		var cur: String = stack.pop_back()
 		for nb in _conquest_neighbors(cur):
-			if String(conquest_owner.get(nb, "")) == "player" and not supplied.has(nb):
+			if String(conquest_owner.get(nb, "")) == pid and not supplied.has(nb):
 				supplied[nb] = true
 				stack.append(nb)
 	return supplied
 
-func territory_supplied(tid: String) -> bool:
-	return conquest_supplied().has(tid)
+# Player-side aliases (keep the old names for UI/tests).
+func conquest_supply_sources() -> Array:
+	return conquest_supply_sources_for(player_power_id)
 
-# Enemy-owned, on the frontline, AND adjacent to a SUPPLIED player territory —
-# an offensive must stage from a territory still connected to supply.
-func territory_attackable(tid: String) -> bool:
-	if String(conquest_owner.get(tid, "")) != "enemy":
+func conquest_supplied() -> Dictionary:
+	return conquest_supplied_for(player_power_id)
+
+func territory_supplied(tid: String) -> bool:
+	var owner := String(conquest_owner.get(tid, ""))
+	if owner == "" or owner == NEUTRAL:
 		return false
-	var supplied := conquest_supplied()
+	return conquest_supplied_for(owner).has(tid)
+
+# Can `pid` attack `tid`? Enemy-owned, battle-bearing, and adjacent to a SUPPLIED
+# pid territory (an offensive must stage from a supplied province).
+func _territory_attackable_by(pid: String, tid: String) -> bool:
+	var owner := String(conquest_owner.get(tid, ""))
+	if owner == pid or pid == NEUTRAL or pid == "":
+		return false
+	if String(conquest_territory(tid).get("scenario", "")) == "":
+		return false
+	var supplied := conquest_supplied_for(pid)
 	for nb in _conquest_neighbors(tid):
-		if supplied.has(nb):   # supplied.has(nb) implies nb is player-owned
+		if supplied.has(nb):   # supplied.has(nb) implies nb is pid-owned
 			return true
 	return false
 
-# The enemy's strategic pick: a player-held, battle-bearing frontier territory it
-# hasn't been repelled from yet. "" if it has no valid counter-attack.
-func _enemy_pick_target() -> String:
+# The player can attack only when no defence is pending and they haven't already
+# attacked this round.
+func territory_attackable(tid: String) -> bool:
+	if not conquest_defense_queue.is_empty() or conquest_player_attacked:
+		return false
+	return _territory_attackable_by(player_power_id, tid)
+
+# --- Deterministic auto-resolution (AI-vs-AI battles never open a scene) ---
+# All-integer strength estimate; ties strictly favour the defender, so outcomes
+# are a pure function of board state (reproducible in headless tests).
+
+func _power_army(pid: String) -> int:
+	return conquest_army if pid == player_power_id else int(conquest_power_army.get(pid, 0))
+
+func _adjacent_owned_supplied(pid: String, tid: String) -> int:
+	var sup := conquest_supplied_for(pid)
+	var n := 0
+	for nb in _conquest_neighbors(tid):
+		if String(conquest_owner.get(nb, "")) == pid and sup.has(nb):
+			n += 1
+	return n
+
+func _est_strength(pid: String, tid: String, as_defender: bool) -> int:
+	var s := conquest_supplied_for(pid).size() \
+		+ _power_army(pid) * AR_W_ARMY \
+		+ _adjacent_owned_supplied(pid, tid)
+	if as_defender:
+		s += conquest_fortify_level(tid) * AR_W_FORT + int(conquest_territory(tid).get("defense", 0)) + AR_W_DEFENDER
+	return s
+
+func _auto_resolve(attacker: String, tid: String) -> bool:
+	var defender := String(conquest_owner.get(tid, ""))
+	var won := _est_strength(attacker, tid, false) > _est_strength(defender, tid, true)
+	if won:
+		conquest_owner[tid] = attacker
+	return won
+
+# --- AI power turn ---
+
+func _key_gt(a: Array, b: Array) -> bool:
+	# Compare [margin, is_city, tid]: higher margin, then city, then LOWER tid (stable order).
+	if int(a[0]) != int(b[0]):
+		return int(a[0]) > int(b[0])
+	if int(a[1]) != int(b[1]):
+		return int(a[1]) > int(b[1])
+	return String(a[2]) < String(b[2])
+
+func _ai_pick_target(pid: String) -> Dictionary:
+	var best := {}
+	var best_key: Array = []
 	for t in conquest_territories():
 		var tid := String(t.get("id", ""))
-		if String(conquest_owner.get(tid, "")) != "player":
+		if not _territory_attackable_by(pid, tid):
 			continue
-		if String(t.get("scenario", "")) == "" or conquest_secured.has(tid):
-			continue
-		if _adjacent_owned_by(tid, "enemy"):
-			return tid
-	return ""
+		var d := String(conquest_owner.get(tid, ""))
+		var margin := _est_strength(pid, tid, false) - _est_strength(d, tid, true)
+		if margin <= 0:
+			continue   # only launch winnable attacks → strategic progress, no thrash
+		var key: Array = [margin, (1 if _is_city(t) else 0), tid]
+		if best.is_empty() or _key_gt(key, best_key):
+			best_key = key
+			best = {"territory": tid, "defender": d, "margin": margin}
+	return best
 
-func has_enemy_counter() -> bool:
-	return conquest_enemy_target != ""
+func _ai_spend(pid: String) -> void:
+	if int(conquest_power_army.get(pid, 0)) < CONQ_AI_ARMY_MAX and int(conquest_treasury.get(pid, 0)) >= CONQ_AI_ARMY_COST:
+		conquest_treasury[pid] = int(conquest_treasury.get(pid, 0)) - CONQ_AI_ARMY_COST
+		conquest_power_army[pid] = int(conquest_power_army.get(pid, 0)) + 1
+
+func _ai_take_turn(pid: String) -> void:
+	_ai_spend(pid)
+	var pick := _ai_pick_target(pid)
+	if pick.is_empty():
+		return
+	var tid := String(pick.get("territory", ""))
+	if String(pick.get("defender", "")) == player_power_id:
+		# The player must play this defence tactically — queue it.
+		conquest_defense_queue.append({"attacker": pid, "territory": tid})
+		conquest_last_round_log.append({"power": pid, "kind": "attack_player", "territory": tid})
+	else:
+		var won := _auto_resolve(pid, tid)
+		conquest_last_round_log.append({"power": pid, "kind": "auto", "territory": tid, "won": won})
+		if won:
+			_check_eliminations(pid)
+
+# Advance one strategic round: every surviving AI power expands (AI-vs-AI auto-
+# resolved, AI-vs-player queued as a defence), then all powers collect income.
+# Refuses while a defence is pending or a battle is mid-flight (resolve those
+# first). Returns false if it could not advance.
+func advance_conquest_round() -> bool:
+	if not in_conquest() or conquest_over():
+		return false
+	if not conquest_defense_queue.is_empty() or not conquest_battle.is_empty():
+		return false
+	conquest_last_round_log = []
+	for pid in _ai_powers_in_order():
+		_ai_take_turn(pid)
+	for pid in _all_powers():
+		if not _is_eliminated(pid):
+			_grant_income(pid)
+	conquest_player_attacked = false
+	conquest_secured = {}          # repel immunity lasts only the round it was earned
+	conquest_round += 1
+	_update_victory_state()
+	return true
+
+func _grant_income(pid: String) -> void:
+	var inc := conquest_income_for(pid)
+	if pid == player_power_id:
+		conquest_strength += inc
+	else:
+		conquest_treasury[pid] = int(conquest_treasury.get(pid, 0)) + inc
+
+# --- Battle setup / resolution (the tactical layer stays two-sided) ---
 
 func begin_conquest_attack(tid: String) -> bool:
-	if conquest_enemy_target != "" or not territory_attackable(tid):
+	if not conquest_defense_queue.is_empty() or conquest_player_attacked:
 		return false
-	conquest_battle = {"territory": tid, "defense": false}
+	if not territory_attackable(tid):
+		return false
+	conquest_battle = {"territory": tid, "defense": false,
+		"attacker": player_power_id, "defender": String(conquest_owner.get(tid, ""))}
 	current_scenario_id = String(conquest_territory(tid).get("scenario", ""))
 	return true
 
+# Peek the next VALID queued defence, auto-resolving any stale entries whose
+# territory already changed hands before the player could get to it.
+func _peek_defense() -> Dictionary:
+	while not conquest_defense_queue.is_empty():
+		var e: Dictionary = conquest_defense_queue[0]
+		if String(conquest_owner.get(String(e.get("territory", "")), "")) == player_power_id:
+			return e
+		var stale: Dictionary = conquest_defense_queue.pop_front()
+		_auto_resolve(String(stale.get("attacker", "")), String(stale.get("territory", "")))
+		_check_eliminations(String(stale.get("attacker", "")))
+	return {}
+
 func begin_conquest_defense() -> bool:
-	if conquest_enemy_target == "":
+	var e := _peek_defense()
+	if e.is_empty():
 		return false
-	conquest_battle = {"territory": conquest_enemy_target, "defense": true}
-	current_scenario_id = String(conquest_territory(conquest_enemy_target).get("scenario", ""))
+	var tid := String(e.get("territory", ""))
+	conquest_battle = {"territory": tid, "defense": true,
+		"attacker": String(e.get("attacker", "")), "defender": player_power_id}
+	current_scenario_id = String(conquest_territory(tid).get("scenario", ""))
 	return true
 
+func has_enemy_counter() -> bool:
+	return not _peek_defense().is_empty()
+
+func conquest_pending_defenses() -> Array:
+	return conquest_defense_queue
+
 # Back out of a battle that was set up but not fought (e.g. the player pressed
-# "back" on the briefing). Drops the pending battle only; a queued enemy counter
-# (conquest_enemy_target) stays queued, so a defence can't be dodged permanently.
+# "back" on the briefing). Drops the pending battle only; a queued defence stays
+# queued, so a defence can't be dodged permanently.
 func cancel_conquest_battle() -> void:
 	conquest_battle = {}
 
-# Apply a finished battle to the strategic map and advance the turn.
+# Apply a finished battle to the strategic map. Round income/AI expansion happen
+# in advance_conquest_round, NOT here.
 func resolve_conquest_battle(player_won: bool) -> void:
 	var tid := String(conquest_battle.get("territory", ""))
 	var defense: bool = bool(conquest_battle.get("defense", false))
+	var attacker := String(conquest_battle.get("attacker", ""))
 	conquest_battle = {}
 	conquest_prep = {}   # pre-battle preparations are spent by the fought battle
 	if tid == "":
 		return
+	var conqueror := ""
 	if defense:
+		if not conquest_defense_queue.is_empty():
+			conquest_defense_queue.pop_front()
 		if player_won:
-			conquest_secured[tid] = true         # repelled the counter — now safe
+			conquest_secured[tid] = true         # repelled the counter this round
 		else:
-			conquest_owner[tid] = "enemy"          # territory retaken
-		conquest_enemy_target = ""                 # enemy's turn is spent
+			conquest_owner[tid] = attacker         # the AI power retakes it
+			conqueror = attacker
 	else:
+		conquest_player_attacked = true
 		if player_won:
-			conquest_owner[tid] = "player"
-		# A round passed: collect strength, then the enemy queues its counter.
-		conquest_strength += conquest_income()
-		conquest_enemy_target = _enemy_pick_target()
+			conquest_owner[tid] = player_power_id
+			conqueror = player_power_id
+	_check_eliminations(conqueror)
+	_update_victory_state()
+
+# --- Elimination & victory ---
+
+func _check_eliminations(conqueror: String) -> void:
+	for pid in _all_powers():
+		if _is_eliminated(pid):
+			continue
+		if _city_count(pid) == 0:
+			_eliminate(pid, conqueror)
+
+func _eliminate(pid: String, conqueror: String) -> void:
+	conquest_eliminated[pid] = true
+	var heir := conqueror
+	if heir == "" or heir == pid or _is_eliminated(heir):
+		heir = NEUTRAL
+	for t in conquest_territories():
+		var tid := String(t.get("id", ""))
+		if String(conquest_owner.get(tid, "")) == pid:
+			conquest_owner[tid] = heir
+
+func _update_victory_state() -> void:
+	if conquest_result != "":
+		return
+	if _is_eliminated(player_power_id) or _city_count(player_power_id) == 0:
+		conquest_result = "lost"
+	elif _surviving_powers().size() <= 1:
+		conquest_result = "won"
 
 func conquest_won() -> bool:
-	if not in_conquest():
-		return false
-	for tid in conquest_owner:
-		if String(conquest_owner[tid]) == "enemy":
-			return false
-	return true
+	return in_conquest() and conquest_result == "won"
+
+func conquest_lost() -> bool:
+	return in_conquest() and conquest_result == "lost"
+
+func conquest_over() -> bool:
+	return conquest_result != ""
 
 func conquest_counts() -> Dictionary:
-	var player := 0
+	var player_terr := 0
+	var player_cities := 0
 	var total := 0
-	for tid in conquest_owner:
+	for t in conquest_territories():
 		total += 1
-		if String(conquest_owner[tid]) == "player":
-			player += 1
-	return {"player": player, "total": total}
+		if String(conquest_owner.get(String(t.get("id", "")), "")) == player_power_id:
+			player_terr += 1
+			if _is_city(t):
+				player_cities += 1
+	return {"player": player_terr, "player_cities": player_cities, "total": total,
+		"powers_alive": _surviving_powers().size()}
 
-# Strength earned per round: one per SUPPLIED owned territory, plus industry.
-# Territories cut off from supply by an enemy counter yield nothing.
+# Per-power {territories, cities, eliminated} for the UI standings strip.
+func conquest_power_counts() -> Dictionary:
+	var out := {}
+	for pid in _all_powers():
+		out[pid] = {"territories": 0, "cities": 0, "eliminated": _is_eliminated(pid)}
+	for t in conquest_territories():
+		var o := String(conquest_owner.get(String(t.get("id", "")), ""))
+		if out.has(o):
+			out[o]["territories"] += 1
+			if _is_city(t):
+				out[o]["cities"] += 1
+	return out
+
+# Strength earned per round by a power: base per supplied city + supplied
+# resource yields; the player also adds industry. Cut-off territories yield none.
+func conquest_income_for(pid: String) -> int:
+	var total := 0
+	for tid in conquest_supplied_for(pid):
+		var t := conquest_territory(tid)
+		if _is_city(t):
+			total += CONQ_CITY_BASE + int(t.get("yield", 0))
+		else:
+			total += int(t.get("yield", RESOURCE_DEFAULT_YIELD))
+	if pid == player_power_id:
+		total += conquest_industry
+	return total
+
 func conquest_income() -> int:
-	return conquest_supplied().size() + conquest_industry
+	return conquest_income_for(player_power_id)
 
 func can_muster() -> bool:
 	return in_conquest() and conquest_army < CONQ_ARMY_MAX and conquest_strength >= CONQ_MUSTER_COST
@@ -547,7 +858,7 @@ func muster() -> bool:
 	return true
 
 func can_fortify(tid: String) -> bool:
-	if not in_conquest() or String(conquest_owner.get(tid, "")) != "player":
+	if not in_conquest() or String(conquest_owner.get(tid, "")) != player_power_id:
 		return false
 	if String(conquest_territory(tid).get("scenario", "")) == "":
 		return false  # the home base has no battle to fortify
@@ -612,3 +923,52 @@ func prepare(kind: String) -> bool:
 
 func prep_active(kind: String) -> bool:
 	return bool(conquest_prep.get(kind, false))
+
+# --- City actions: recruit fresh troops / reinforce, at a supplied city ---
+
+func conquest_has_supplied_city() -> bool:
+	var sup := conquest_supplied_for(player_power_id)
+	for t in conquest_territories():
+		var tid := String(t.get("id", ""))
+		if _is_city(t) and String(conquest_owner.get(tid, "")) == player_power_id and sup.has(tid):
+			return true
+	return false
+
+func _recruit_type() -> String:
+	return String(DataLoader.get_conquest(conquest_id).get("recruit_unit", "musketeers"))
+
+func can_recruit() -> bool:
+	return in_conquest() and conquest_has_supplied_city() \
+		and conquest_roster.size() < CONQ_ROSTER_MAX and conquest_strength >= CONQ_RECRUIT_COST
+
+func recruit() -> bool:
+	if not can_recruit():
+		return false
+	conquest_strength -= CONQ_RECRUIT_COST
+	conquest_roster.append({"type": _recruit_type(), "name": "新兵",
+		"xp": conquest_training * CONQ_TRAIN_XP, "rank": 0, "general": ""})
+	return true
+
+func _lowest_rank_idx() -> int:
+	var idx := -1
+	var best := 9999
+	for i in range(conquest_roster.size()):
+		var r := int(conquest_roster[i].get("rank", 0))
+		if r < best:
+			best = r
+			idx = i
+	return idx
+
+func can_heal() -> bool:
+	if not in_conquest() or not conquest_has_supplied_city() or conquest_strength < CONQ_HEAL_COST:
+		return false
+	var i := _lowest_rank_idx()
+	return i >= 0 and int(conquest_roster[i].get("rank", 0)) < ROSTER_RANK_MAX
+
+func heal() -> bool:
+	if not can_heal():
+		return false
+	conquest_strength -= CONQ_HEAL_COST
+	var i := _lowest_rank_idx()
+	conquest_roster[i]["rank"] = int(conquest_roster[i].get("rank", 0)) + 1
+	return true
