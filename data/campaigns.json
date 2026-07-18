@@ -47,18 +47,37 @@
     ]
   },
   "grand_campaign": {
-    "title": "歐陸大會戰:1314–1709",
-    "description": "一條貫穿近四百年的征程,依序重演全部九場歷史會戰,從班諾克本的長矛陣到波爾塔瓦的多面堡。你的部隊將經歷長弓、火繩槍、線列火槍與騎兵突擊的演變——這是對老兵存續的終極考驗。",
+    "title": "歐陸大會戰:1314–1759",
+    "description": "一條橫跨四個半世紀的征程,依年代重演全部 28 場歷史會戰,從班諾克本的長矛陣到庫勒斯多夫的壕溝高地。你的部隊將走過長弓、火繩槍、線列火槍、野戰工事與騎砲協同的演變——這是對老兵存續的終極考驗。",
     "scenarios": [
       "01_bannockburn_1314",
       "02_crecy_1346",
       "03_agincourt_1415",
+      "13_cerignola_1503",
+      "14_ravenna_1512",
       "04_marignano_1515",
+      "15_bicocca_1522",
       "05_pavia_1525",
       "06_breitenfeld_1631",
+      "25_lutzen_1632",
+      "26_nordlingen_1634",
+      "27_edgehill_1642",
       "07_rocroi_1643",
+      "28_marston_moor_1644",
+      "29_naseby_1645",
+      "11_narva_1700",
       "08_blenheim_1704",
-      "09_poltava_1709"
+      "19_ramillies_1706",
+      "20_oudenarde_1708",
+      "12_lesnaya_1708",
+      "09_poltava_1709",
+      "21_malplaquet_1709",
+      "22_mollwitz_1741",
+      "23_hohenfriedberg_1745",
+      "24_soor_1745",
+      "16_rossbach_1757",
+      "17_leuthen_1757",
+      "18_kunersdorf_1759"
     ]
   },
   "great_northern_war": {

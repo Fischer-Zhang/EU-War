@@ -34,6 +34,46 @@ func _run() -> void:
 	var dl = root.get_node("DataLoader")
 	await process_frame
 
+	# The grand campaign must remain the complete chronological tour. This list
+	# deliberately follows history rather than scenario filename numbering.
+	var expected_grand: Array = [
+		"01_bannockburn_1314",
+		"02_crecy_1346",
+		"03_agincourt_1415",
+		"13_cerignola_1503",
+		"14_ravenna_1512",
+		"04_marignano_1515",
+		"15_bicocca_1522",
+		"05_pavia_1525",
+		"06_breitenfeld_1631",
+		"25_lutzen_1632",
+		"26_nordlingen_1634",
+		"27_edgehill_1642",
+		"07_rocroi_1643",
+		"28_marston_moor_1644",
+		"29_naseby_1645",
+		"11_narva_1700",
+		"08_blenheim_1704",
+		"19_ramillies_1706",
+		"20_oudenarde_1708",
+		"12_lesnaya_1708",
+		"09_poltava_1709",
+		"21_malplaquet_1709",
+		"22_mollwitz_1741",
+		"23_hohenfriedberg_1745",
+		"24_soor_1745",
+		"16_rossbach_1757",
+		"17_leuthen_1757",
+		"18_kunersdorf_1759",
+	]
+	var grand_scens: Array = dl.get_campaign("grand_campaign").get("scenarios", [])
+	ok(grand_scens == expected_grand, "grand campaign contains all 28 battles in chronological order")
+	var historical_count := 0
+	for scenario in dl.scenarios:
+		if String(scenario.get("id", "")) not in ["00_tutorial", "10_sandbox"]:
+			historical_count += 1
+	ok(grand_scens.size() == historical_count, "grand campaign covers every historical scenario")
+
 	var cid = String(dl.campaigns.keys()[0])
 	var scens: Array = dl.get_campaign(cid).get("scenarios", [])
 	ok(scens.size() >= 2, "campaign has at least two scenarios")

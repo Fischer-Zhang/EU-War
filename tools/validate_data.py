@@ -120,9 +120,35 @@ def main():
         scens = c.get("scenarios", [])
         if not scens:
             errors.append(f"campaign {cid}: empty scenario list")
+        if len(scens) != len(set(scens)):
+            errors.append(f"campaign {cid}: duplicate scenario entries")
         for sid in scens:
             if sid not in scenario_ids:
                 errors.append(f"campaign {cid}: unknown scenario '{sid}'")
+
+    # The grand campaign is the complete chronological tour. Keep this contract
+    # data-driven so every newly added historical scenario must be integrated.
+    grand_scens = campaigns.get("grand_campaign", {}).get("scenarios", [])
+    historical_ids = scenario_ids - {"00_tutorial", "10_sandbox"}
+    grand_ids = set(grand_scens)
+    missing_grand = sorted(historical_ids - grand_ids)
+    extra_grand = sorted(grand_ids - historical_ids)
+    if missing_grand:
+        errors.append(f"campaign grand_campaign: missing historical scenarios {missing_grand}")
+    if extra_grand:
+        errors.append(f"campaign grand_campaign: non-historical scenarios {extra_grand}")
+    previous_year = 0
+    for sid in grand_scens:
+        year_text = sid.rsplit("_", 1)[-1]
+        if not year_text.isdigit():
+            errors.append(f"campaign grand_campaign: scenario '{sid}' has no trailing year")
+            continue
+        year = int(year_text)
+        if year < previous_year:
+            errors.append(
+                f"campaign grand_campaign: '{sid}' ({year}) is out of chronological order"
+            )
+        previous_year = year
 
     # Conquest (optional): territories, adjacency, and per-territory scenarios.
     conquest_path = os.path.join(DATA, "conquest.json")
