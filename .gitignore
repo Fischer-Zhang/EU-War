@@ -9,3 +9,5 @@ bin/
 .DS_Store
 __pycache__/
 *.pyc
+# Editor/atomic-save temp files
+*.tmp.*
