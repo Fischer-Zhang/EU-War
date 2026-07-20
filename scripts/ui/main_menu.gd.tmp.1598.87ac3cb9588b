@@ -40,33 +40,28 @@ func _add_campaign_button() -> void:
 	vbox.add_child(btn)
 	vbox.move_child(btn, single_battle_button.get_index() + 1)
 
-func _mk_menu_button(text: String) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.custom_minimum_size = single_battle_button.custom_minimum_size
-	b.add_theme_font_size_override("font_size",
+func _menu_button(text: String, cb: Callable) -> Button:
+	var btn := Button.new()
+	btn.text = text
+	btn.custom_minimum_size = single_battle_button.custom_minimum_size
+	btn.add_theme_font_size_override("font_size",
 		single_battle_button.get_theme_font_size("font_size"))
-	return b
+	btn.pressed.connect(cb)
+	return btn
 
 func _add_conquest_button() -> void:
 	if DataLoader.conquests.is_empty():
 		return
 	var vbox := single_battle_button.get_parent()
 	var has_save := GameState.has_conquest_save()
+	# Resume an in-progress grand conquest across sessions.
 	if has_save:
-		var cont := _mk_menu_button("繼續征服")
-		cont.pressed.connect(_on_conquest_continue)
+		var cont := _menu_button("繼續征服", _on_conquest_continue)
 		vbox.add_child(cont)
 		vbox.move_child(cont, quit_button.get_index())
-	var btn := _mk_menu_button("新征服" if has_save else "征服")
-	btn.pressed.connect(_on_conquest_pressed)
+	var btn := _menu_button("新征服" if has_save else "征服", _on_conquest_pressed)
 	vbox.add_child(btn)
 	vbox.move_child(btn, quit_button.get_index())
-
-func _on_conquest_continue() -> void:
-	GameState.clear_campaign()
-	if GameState.load_conquest():
-		get_tree().change_scene_to_file("res://scenes/conquest_map.tscn")
 
 # Global tech tree entry. Only shown when techs are defined. Opens in global
 # (no campaign/conquest) context so the screen's "back" returns to this menu.

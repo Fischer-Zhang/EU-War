@@ -31,6 +31,8 @@ var campaign_side: int = 0
 const RESEARCH_START := 3
 const RESEARCH_PER_WIN := 3
 const PROGRESS_SAVE_PATH := "user://progress.json"
+const CONQUEST_SAVE_PATH := "user://conquest_save.json"
+const CONQUEST_SAVE_FILE := "conquest_save.json"
 var research_points: int = 0
 var unlocked_techs: Array = []
 
@@ -411,6 +413,7 @@ func start_conquest(id: String) -> void:
 	for pid in _ai_powers_in_order():
 		conquest_treasury[pid] = CONQ_START_STRENGTH
 		conquest_power_army[pid] = 0
+	save_conquest()   # a fresh conquest is immediately resumable
 
 func clear_conquest() -> void:
 	conquest_id = ""
@@ -689,6 +692,7 @@ func advance_conquest_round() -> bool:
 	conquest_secured = {}          # repel immunity lasts only the round it was earned
 	conquest_round += 1
 	_update_victory_state()
+	save_conquest()
 	return true
 
 func _grant_income(pid: String) -> void:
@@ -771,6 +775,7 @@ func resolve_conquest_battle(player_won: bool) -> void:
 			conqueror = player_power_id
 	_check_eliminations(conqueror)
 	_update_victory_state()
+	save_conquest()
 
 # --- Elimination & victory ---
 
@@ -859,6 +864,7 @@ func muster() -> bool:
 		return false
 	conquest_strength -= CONQ_MUSTER_COST
 	conquest_army += 1
+	save_conquest()
 	return true
 
 func can_fortify(tid: String) -> bool:
@@ -875,6 +881,7 @@ func fortify(tid: String) -> bool:
 		return false
 	conquest_strength -= CONQ_FORTIFY_COST
 	conquest_fortify[tid] = int(conquest_fortify.get(tid, 0)) + 1
+	save_conquest()
 	return true
 
 func conquest_fortify_level(tid: String) -> int:
@@ -903,6 +910,7 @@ func develop(track: String) -> bool:
 	match track:
 		"industry": conquest_industry += 1
 		"training": conquest_training += 1
+	save_conquest()
 	return true
 
 func develop_level(track: String) -> int:
@@ -923,6 +931,7 @@ func prepare(kind: String) -> bool:
 		return false
 	conquest_strength -= int(CONQ_PREP_COST[kind])
 	conquest_prep[kind] = true
+	save_conquest()
 	return true
 
 func prep_active(kind: String) -> bool:
@@ -951,6 +960,7 @@ func recruit() -> bool:
 	conquest_strength -= CONQ_RECRUIT_COST
 	conquest_roster.append({"type": _recruit_type(), "name": "新兵",
 		"xp": conquest_training * CONQ_TRAIN_XP, "rank": 0, "general": ""})
+	save_conquest()
 	return true
 
 func _lowest_rank_idx() -> int:
@@ -975,4 +985,90 @@ func heal() -> bool:
 	conquest_strength -= CONQ_HEAL_COST
 	var i := _lowest_rank_idx()
 	conquest_roster[i]["rank"] = int(conquest_roster[i].get("rank", 0)) + 1
+	save_conquest()
+	return true
+
+# --- Conquest persistence (a grand game spans many sessions) ---
+# The whole strategic state is snapshotted to user:// after every state change.
+# A finished game (won/lost) deletes its save so it isn't offered as resumable.
+
+func has_conquest_save() -> bool:
+	return FileAccess.file_exists(CONQUEST_SAVE_PATH)
+
+func delete_conquest_save() -> void:
+	var d := DirAccess.open("user://")
+	if d != null and d.file_exists(CONQUEST_SAVE_FILE):
+		d.remove(CONQUEST_SAVE_FILE)
+
+func save_conquest() -> void:
+	if not in_conquest():
+		return
+	if conquest_over():
+		delete_conquest_save()   # a decided game is not resumable
+		return
+	var data := {
+		"conquest_id": conquest_id,
+		"player_power_id": player_power_id,
+		"owner": conquest_owner,
+		"secured": conquest_secured,
+		"defense_queue": conquest_defense_queue,
+		"eliminated": conquest_eliminated,
+		"result": conquest_result,
+		"round": conquest_round,
+		"player_attacked": conquest_player_attacked,
+		"treasury": conquest_treasury,
+		"power_army": conquest_power_army,
+		"last_round_log": conquest_last_round_log,
+		"last_fought": conquest_last_fought,
+		"strength": conquest_strength,
+		"fortify": conquest_fortify,
+		"army": conquest_army,
+		"industry": conquest_industry,
+		"training": conquest_training,
+		"prep": conquest_prep,
+		"roster": conquest_roster,
+	}
+	var f := FileAccess.open(CONQUEST_SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(JSON.stringify(data))
+	f.close()
+
+func load_conquest() -> bool:
+	if not FileAccess.file_exists(CONQUEST_SAVE_PATH):
+		return false
+	var f := FileAccess.open(CONQUEST_SAVE_PATH, FileAccess.READ)
+	if f == null:
+		return false
+	var parsed = JSON.parse_string(f.get_as_text())
+	f.close()
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	var qid := String(parsed.get("conquest_id", ""))
+	if qid == "" or DataLoader.get_conquest(qid).is_empty():
+		delete_conquest_save()
+		return false
+	conquest_id = qid
+	conquest_powers = _load_powers()
+	player_power_id = String(parsed.get("player_power_id", _find_player_power()))
+	conquest_owner = parsed.get("owner", {})
+	conquest_secured = parsed.get("secured", {})
+	conquest_defense_queue = parsed.get("defense_queue", [])
+	conquest_eliminated = parsed.get("eliminated", {})
+	conquest_result = String(parsed.get("result", ""))
+	conquest_round = int(parsed.get("round", 0))
+	conquest_player_attacked = bool(parsed.get("player_attacked", false))
+	conquest_treasury = parsed.get("treasury", {})
+	conquest_power_army = parsed.get("power_army", {})
+	conquest_last_round_log = parsed.get("last_round_log", [])
+	conquest_last_fought = String(parsed.get("last_fought", ""))
+	conquest_strength = int(parsed.get("strength", 0))
+	conquest_fortify = parsed.get("fortify", {})
+	conquest_army = int(parsed.get("army", 0))
+	conquest_industry = int(parsed.get("industry", 0))
+	conquest_training = int(parsed.get("training", 0))
+	conquest_prep = parsed.get("prep", {})
+	conquest_roster = parsed.get("roster", [])
+	conquest_battle = {}
+	player_faction_override = ""
 	return true

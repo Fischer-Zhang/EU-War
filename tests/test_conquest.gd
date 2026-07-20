@@ -152,6 +152,28 @@ func _run() -> void:
 	ok(not gs.conquest_has_supplied_city(), "no supplied city after losing all cities")
 	ok(not gs.can_recruit() and not gs.can_heal(), "cannot recruit/heal without a supplied city")
 
+	# --- Save / load round-trip ---
+	gs.start_conquest("test_arena")
+	gs.begin_conquest_attack("r_cap")
+	gs.resolve_conquest_battle(true)            # capture r_cap (eliminates red) — autosaves
+	gs.conquest_strength = 17
+	gs.save_conquest()
+	ok(gs.has_conquest_save(), "conquest autosaves during play")
+	var owner_snap := _owners_snapshot(gs)
+	gs.clear_conquest()
+	ok(not gs.in_conquest(), "cleared in-memory before load")
+	ok(gs.load_conquest(), "load_conquest restores a saved game")
+	ok(gs.conquest_id == "test_arena" and gs.player_power_id == "blue", "loaded id + player power")
+	ok(_owners_snapshot(gs) == owner_snap, "ownership restored exactly")
+	ok(gs.conquest_strength == 17, "economy restored")
+	ok(gs._is_eliminated("red"), "elimination state restored")
+	# A decided game removes its save (not resumable).
+	gs.start_conquest("test_arena")
+	gs.conquest_result = "won"
+	gs.save_conquest()
+	ok(not gs.has_conquest_save(), "a finished conquest deletes its save")
+	gs.delete_conquest_save()
+
 	# --- Real-battle conquest bonuses (army/fortify/training/barrage), multi-power ---
 	gs.start_conquest(qid)
 	gs.conquest_army = 2
