@@ -373,9 +373,14 @@ const CONQ_HEAL_COST := 3                  # reinforce (rank up) the weakest ros
 const CONQ_ROSTER_MAX := 8
 const CONQ_AI_ARMY_COST := 4
 const CONQ_AI_ARMY_MAX := 4
-const AR_W_ARMY := 1                        # auto-resolve: weight of army level
-const AR_W_FORT := 1                        # auto-resolve: weight of fortify (defender)
-const AR_W_DEFENDER := 1                    # auto-resolve: home-defence edge / tie-breaker
+# Auto-resolve is LOCAL, not empire-wide: a power's strength at a front comes from
+# its army level and its territories massed AROUND that front, not its total size.
+# This stops the biggest empire steamrolling every border at once (anti-snowball).
+const AR_W_ARMY := 2                        # weight of army level
+const AR_W_ADJ := 2                         # weight of own supplied territories adjacent to the front
+const AR_W_SIZE := 0                        # weight of total empire size (0 = size does not project)
+const AR_W_FORT := 2                        # weight of fortify (defender)
+const AR_W_DEFENDER := 1                    # home-defence edge / tie-breaker
 var conquest_strength: int = 0
 var conquest_fortify: Dictionary = {}     # territory_id -> fortify level
 var conquest_army: int = 0
@@ -611,9 +616,9 @@ func _adjacent_owned_supplied(pid: String, tid: String) -> int:
 	return n
 
 func _est_strength(pid: String, tid: String, as_defender: bool) -> int:
-	var s := conquest_supplied_for(pid).size() \
-		+ _power_army(pid) * AR_W_ARMY \
-		+ _adjacent_owned_supplied(pid, tid)
+	var s := _power_army(pid) * AR_W_ARMY \
+		+ _adjacent_owned_supplied(pid, tid) * AR_W_ADJ \
+		+ (conquest_supplied_for(pid).size() * AR_W_SIZE if AR_W_SIZE > 0 else 0)
 	if as_defender:
 		s += conquest_fortify_level(tid) * AR_W_FORT + int(conquest_territory(tid).get("defense", 0)) + AR_W_DEFENDER
 	return s

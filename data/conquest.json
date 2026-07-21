@@ -81,15 +81,14 @@
         "id": "wessex",
         "name": "威塞克斯",
         "owner": "england",
-        "type": "resource",
+        "type": "city",
         "x": 0.1,
         "y": 0.35,
         "scenario": "04_marignano_1515",
         "links": [
           "london",
           "normandy"
-        ],
-        "yield": 2
+        ]
       },
       {
         "id": "ireland",
@@ -248,7 +247,7 @@
       {
         "id": "flanders",
         "name": "法蘭德斯",
-        "owner": "habsburg",
+        "owner": "neutral",
         "type": "city",
         "x": 0.32,
         "y": 0.26,
@@ -281,7 +280,7 @@
       {
         "id": "brandenburg",
         "name": "布蘭登堡",
-        "owner": "habsburg",
+        "owner": "neutral",
         "type": "city",
         "x": 0.45,
         "y": 0.25,
@@ -381,7 +380,7 @@
       {
         "id": "hungary",
         "name": "匈牙利",
-        "owner": "habsburg",
+        "owner": "neutral",
         "type": "city",
         "x": 0.55,
         "y": 0.43,
@@ -444,7 +443,7 @@
         "id": "denmark",
         "name": "丹麥",
         "owner": "sweden",
-        "type": "resource",
+        "type": "city",
         "x": 0.42,
         "y": 0.19,
         "scenario": "27_edgehill_1642",
@@ -452,8 +451,7 @@
           "brandenburg",
           "stockholm",
           "livonia"
-        ],
-        "yield": 2
+        ]
       },
       {
         "id": "stockholm",
@@ -550,7 +548,7 @@
         "id": "smolensk",
         "name": "斯摩棱斯克",
         "owner": "russia",
-        "type": "resource",
+        "type": "city",
         "x": 0.67,
         "y": 0.24,
         "scenario": "06_breitenfeld_1631",
@@ -559,8 +557,7 @@
           "moscow",
           "kiev",
           "poland"
-        ],
-        "yield": 2
+        ]
       },
       {
         "id": "kiev",
@@ -582,7 +579,7 @@
         "id": "crimea",
         "name": "克里米亞",
         "owner": "ottoman",
-        "type": "city",
+        "type": "resource",
         "x": 0.66,
         "y": 0.42,
         "scenario": "08_blenheim_1704",
@@ -591,7 +588,8 @@
           "constantinople",
           "anatolia",
           "serbia"
-        ]
+        ],
+        "yield": 2
       },
       {
         "id": "serbia",
