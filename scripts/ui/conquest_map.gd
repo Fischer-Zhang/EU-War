@@ -118,6 +118,7 @@ func _build_hud() -> void:
 		Vector2(28, 80), 15, Color(0.82, 0.86, 0.9))
 
 	_build_standings(Vector2(28, 106))
+	_build_difficulty(Vector2(984, 20))
 	_build_round_log(Vector2(28, 470))
 	_build_dock(busy, over)
 
@@ -149,6 +150,23 @@ func _build_standings(pos: Vector2) -> void:
 		var col := Color(String(p.get("color", "#888888")))
 		chip.modulate = col.darkened(0.4) if elim else col
 		x += 128.0
+
+func _build_difficulty(pos: Vector2) -> void:
+	# The rival powers' AI difficulty — set at the game's start, then locked in.
+	var editable: bool = GameState.conquest_round == 0 and not GameState.conquest_player_attacked \
+		and GameState.conquest_pending_defenses().is_empty() and not GameState.conquest_over()
+	_label("難度", pos, 14, Color(0.8, 0.83, 0.88))
+	var x := pos.x + 48
+	for o in [["easy", "簡單"], ["normal", "普通"], ["hard", "困難"]]:
+		var key: String = o[0]
+		var cur: bool = GameState.conquest_difficulty == key
+		_button(("● " if cur else "") + String(o[1]), Vector2(x, pos.y - 4), Vector2(66, 26),
+			not editable, _set_difficulty.bind(key))
+		x += 72
+
+func _set_difficulty(d: String) -> void:
+	GameState.set_conquest_difficulty(d)
+	_refresh()
 
 func _build_round_log(pos: Vector2) -> void:
 	var log_lines: Array = GameState.conquest_last_round_log

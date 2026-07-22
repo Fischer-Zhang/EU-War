@@ -993,6 +993,8 @@ func _apply_conquest_bonuses() -> void:
 	var fort := 0
 	if defense:
 		fort = GameState.conquest_fortify_level(territory)
+	# When the player ASSAULTS a fortified enemy city, its garrison is dug in too.
+	var enemy_fort: int = GameState.conquest_fortify_level(territory) if not defense else 0
 	# Defending a territory the enemy has cut off from supply: the garrison fights
 	# short of ammo and heart — start suppressed and below full morale.
 	var cut_off: bool = defense and territory != "" and not GameState.territory_supplied(territory)
@@ -1017,10 +1019,13 @@ func _apply_conquest_bonuses() -> void:
 			if cut_off:
 				u.add_suppression(3)
 				u.morale = max(1, u.morale - 3)
-		elif barrage:
-			# Softening barrage: suppress and lightly wound each enemy up front.
-			u.add_suppression(3)
-			u.take_damage(2)
+		else:
+			if enemy_fort > 0:
+				u.dig_in_level = max(u.dig_in_level, min(enemy_fort, Unit.MAX_DIG_IN))
+			if barrage:
+				# Softening barrage: suppress and lightly wound each enemy up front.
+				u.add_suppression(3)
+				u.take_damage(2)
 
 func _has_deployment() -> bool:
 	var dep: Dictionary = scenario.get("deployment", {})

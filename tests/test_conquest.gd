@@ -174,6 +174,19 @@ func _run() -> void:
 	ok(not gs.has_conquest_save(), "a finished conquest deletes its save")
 	gs.delete_conquest_save()
 
+	# --- Difficulty ladder (scales the rival powers' strategic AI) ---
+	gs.difficulty = "hard"
+	gs.start_conquest("test_arena")
+	ok(gs.conquest_difficulty == "hard", "conquest inherits the global difficulty at start")
+	ok(gs._conq_ai_army_max() == 6 and gs._conq_ai_income_bonus() == 1, "hard AI: bigger army cap + income bonus")
+	gs.set_conquest_difficulty("easy")
+	ok(gs._conq_ai_army_max() == 2 and gs._conq_ai_margin_min() == 3, "easy AI: small army cap + timid attacks")
+	gs.set_conquest_difficulty("hard")
+	gs.save_conquest(); gs.clear_conquest()
+	ok(gs.load_conquest() and gs.conquest_difficulty == "hard", "difficulty persists through save/load")
+	gs.delete_conquest_save()
+	gs.difficulty = "normal"   # restore global for later sections
+
 	# --- Real-battle conquest bonuses (army/fortify/training/barrage), multi-power ---
 	gs.start_conquest(qid)
 	gs.conquest_army = 2

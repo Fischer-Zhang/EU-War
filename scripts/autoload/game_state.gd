@@ -345,6 +345,7 @@ var conquest_treasury: Dictionary = {}    # AI power id -> strength
 var conquest_power_army: Dictionary = {}  # AI power id -> army level (feeds auto-resolve)
 var conquest_last_round_log: Array = []   # [{power, kind, territory, won}] for the round report
 var conquest_last_fought: String = ""     # territory of the last tactical battle (map re-focus)
+var conquest_difficulty: String = "normal"  # scales the rival powers' strategic AI
 const NEUTRAL := "neutral"
 # Strategic economy: owned territories earn strength each round, spent on a
 # global army level (+attack in battles), fortifying frontier regions (defenders
@@ -405,6 +406,7 @@ func start_conquest(id: String) -> void:
 	conquest_power_army = {}
 	conquest_last_round_log = []
 	conquest_last_fought = ""
+	conquest_difficulty = difficulty   # inherit the globally-selected difficulty
 	conquest_strength = CONQ_START_STRENGTH
 	conquest_fortify = {}
 	conquest_army = 0
@@ -649,23 +651,73 @@ func _ai_pick_target(pid: String) -> Dictionary:
 			continue
 		var d := String(conquest_owner.get(tid, ""))
 		var margin := _est_strength(pid, tid, false) - _est_strength(d, tid, true)
-		if margin <= 0:
-			continue   # only launch winnable attacks → strategic progress, no thrash
+		if margin < _conq_ai_margin_min():
+			continue   # only launch winnable-enough attacks (threshold scales with difficulty)
 		var key: Array = [margin, (1 if _is_city(t) else 0), tid]
 		if best.is_empty() or _key_gt(key, best_key):
 			best_key = key
 			best = {"territory": tid, "defender": d, "margin": margin}
 	return best
 
+# --- Difficulty ladder for the rival powers' strategic AI ---
+func _conq_ai_army_max() -> int:
+	match conquest_difficulty:
+		"easy": return 2
+		"hard": return 6
+	return CONQ_AI_ARMY_MAX
+
+func _conq_ai_margin_min() -> int:
+	# Minimum estimated margin before an AI will launch an attack (higher = timid).
+	return 3 if conquest_difficulty == "easy" else 1
+
+func _conq_ai_income_bonus() -> int:
+	return 1 if conquest_difficulty == "hard" else 0
+
+func _conq_ai_fortifies() -> bool:
+	return conquest_difficulty != "easy"
+
+# Set the grand game's difficulty (chosen at its start; persisted).
+func set_conquest_difficulty(d: String) -> void:
+	if in_conquest():
+		conquest_difficulty = d
+		save_conquest()
+
 func _ai_spend(pid: String) -> void:
-	if int(conquest_power_army.get(pid, 0)) < CONQ_AI_ARMY_MAX and int(conquest_treasury.get(pid, 0)) >= CONQ_AI_ARMY_COST:
+	if int(conquest_power_army.get(pid, 0)) < _conq_ai_army_max() and int(conquest_treasury.get(pid, 0)) >= CONQ_AI_ARMY_COST:
 		conquest_treasury[pid] = int(conquest_treasury.get(pid, 0)) - CONQ_AI_ARMY_COST
 		conquest_power_army[pid] = int(conquest_power_army.get(pid, 0)) + 1
+
+# Spend surplus treasury entrenching the least-fortified frontier city (normal/hard).
+func _ai_fortify(pid: String) -> void:
+	if not _conq_ai_fortifies() or int(conquest_treasury.get(pid, 0)) < CONQ_FORTIFY_COST:
+		return
+	var sup := conquest_supplied_for(pid)
+	var best := ""
+	var best_f := CONQ_FORTIFY_MAX
+	for t in conquest_territories():
+		var tid := String(t.get("id", ""))
+		if String(conquest_owner.get(tid, "")) != pid or not _is_city(t) or not sup.has(tid):
+			continue
+		var frontier := false
+		for nb in _conquest_neighbors(tid):
+			if String(conquest_owner.get(nb, "")) != pid:
+				frontier = true
+				break
+		if not frontier:
+			continue
+		var f := conquest_fortify_level(tid)
+		if f < best_f:
+			best_f = f
+			best = tid
+	if best != "":
+		conquest_treasury[pid] = int(conquest_treasury.get(pid, 0)) - CONQ_FORTIFY_COST
+		conquest_fortify[best] = best_f + 1
 
 func _ai_take_turn(pid: String) -> void:
 	_ai_spend(pid)
 	var pick := _ai_pick_target(pid)
 	if pick.is_empty():
+		_ai_fortify(pid)   # nothing to attack — shore up the border instead
 		return
 	var tid := String(pick.get("territory", ""))
 	if String(pick.get("defender", "")) == player_power_id:
@@ -705,7 +757,7 @@ func _grant_income(pid: String) -> void:
 	if pid == player_power_id:
 		conquest_strength += inc
 	else:
-		conquest_treasury[pid] = int(conquest_treasury.get(pid, 0)) + inc
+		conquest_treasury[pid] = int(conquest_treasury.get(pid, 0)) + inc + _conq_ai_income_bonus()
 
 # --- Battle setup / resolution (the tactical layer stays two-sided) ---
 
@@ -1025,6 +1077,7 @@ func save_conquest() -> void:
 		"power_army": conquest_power_army,
 		"last_round_log": conquest_last_round_log,
 		"last_fought": conquest_last_fought,
+		"difficulty": conquest_difficulty,
 		"strength": conquest_strength,
 		"fortify": conquest_fortify,
 		"army": conquest_army,
@@ -1067,6 +1120,7 @@ func load_conquest() -> bool:
 	conquest_power_army = parsed.get("power_army", {})
 	conquest_last_round_log = parsed.get("last_round_log", [])
 	conquest_last_fought = String(parsed.get("last_fought", ""))
+	conquest_difficulty = String(parsed.get("difficulty", "normal"))
 	conquest_strength = int(parsed.get("strength", 0))
 	conquest_fortify = parsed.get("fortify", {})
 	conquest_army = int(parsed.get("army", 0))
