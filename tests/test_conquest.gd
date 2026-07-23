@@ -187,6 +187,37 @@ func _run() -> void:
 	gs.delete_conquest_save()
 	gs.difficulty = "normal"   # restore global for later sections
 
+	# --- Diplomacy: player-brokered truces ---
+	gs.start_conquest("test_arena")
+	gs.conquest_strength = 20
+	ok(gs.territory_attackable("r_cap"), "can attack the rival before a truce")
+	ok(gs.can_offer_truce("red"), "can offer a truce to a rival")
+	var truce_s0 = gs.conquest_strength
+	ok(gs.offer_truce("red"), "offer truce succeeds")
+	ok(gs.at_truce("red") and gs.conquest_strength == truce_s0 - gs.CONQ_TRUCE_COST, "truce set + costs resources")
+	ok(not gs.territory_attackable("r_cap"), "cannot attack a power you are at truce with")
+	# A truced AI does not attack the player even when strong.
+	gs.conquest_power_army["red"] = 6
+	gs.advance_conquest_round()
+	var red_hits_player := false
+	for e in gs.conquest_pending_defenses():
+		if String(e.get("attacker", "")) == "red":
+			red_hits_player = true
+	ok(not red_hits_player, "a truced AI does not attack the player")
+	# Persists through save/load.
+	gs.save_conquest(); gs.clear_conquest()
+	ok(gs.load_conquest() and gs.at_truce("red"), "truce restored from save")
+	# Lapses after its duration.
+	var tguard = 0
+	while gs.at_truce("red") and tguard < 20:
+		gs.conquest_defense_queue = []
+		gs.advance_conquest_round()
+		tguard += 1
+	ok(not gs.at_truce("red"), "truce lapses after its duration")
+	ok(gs.territory_attackable("r_cap") or String(gs.conquest_owner.get("r_cap","")) != "red",
+		"can attack again once the truce lapses")
+	gs.delete_conquest_save()
+
 	# --- Real-battle conquest bonuses (army/fortify/training/barrage), multi-power ---
 	gs.start_conquest(qid)
 	gs.conquest_army = 2

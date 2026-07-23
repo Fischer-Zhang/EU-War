@@ -143,9 +143,10 @@ func _build_standings(pos: Vector2) -> void:
 		var pid := String(p.get("id", ""))
 		var info: Dictionary = pcounts.get(pid, {})
 		var elim: bool = bool(info.get("eliminated", false))
-		var chip := _label("%s %d/%d%s" % [
+		var truce := ("☮%d" % GameState.truce_rounds(pid)) if GameState.at_truce(pid) else ""
+		var chip := _label("%s %d/%d%s%s" % [
 			String(p.get("name", pid)), int(info.get("territories", 0)),
-			int(info.get("cities", 0)), ("✗" if elim else "")],
+			int(info.get("cities", 0)), ("✗" if elim else ""), truce],
 			Vector2(x, pos.y), 14)
 		var col := Color(String(p.get("color", "#888888")))
 		chip.modulate = col.darkened(0.4) if elim else col
@@ -166,6 +167,10 @@ func _build_difficulty(pos: Vector2) -> void:
 
 func _set_difficulty(d: String) -> void:
 	GameState.set_conquest_difficulty(d)
+	_refresh()
+
+func _offer_truce(pid: String) -> void:
+	GameState.offer_truce(pid)
 	_refresh()
 
 func _build_round_log(pos: Vector2) -> void:
@@ -220,6 +225,12 @@ func _build_dock(busy: bool, over: bool) -> void:
 				_button("⚔ 進攻此地", Vector2(x, y), bw, false, _attack.bind(selected_id)); y += 38
 			elif owner == GameState.player_power_id and GameState.can_fortify(selected_id):
 				_button("設防 (費%d)" % GameState.CONQ_FORTIFY_COST, Vector2(x, y), bw, false, _fortify.bind(selected_id)); y += 38
+			# Diplomacy with a rival power (independent of the attack option).
+			if owner != GameState.player_power_id and owner != GameState.NEUTRAL:
+				if GameState.at_truce(owner):
+					_label("停戰中(%d 回合)" % GameState.truce_rounds(owner), Vector2(x, y), 14, Color(0.7, 0.85, 0.7)); y += 26
+				elif GameState.can_offer_truce(owner):
+					_button("提議停戰 (費%d)" % GameState.CONQ_TRUCE_COST, Vector2(x, y), bw, false, _offer_truce.bind(owner)); y += 38
 	else:
 		_label("點選一塊領地", Vector2(x, y), 16, Color(0.75, 0.78, 0.82)); y += 34
 

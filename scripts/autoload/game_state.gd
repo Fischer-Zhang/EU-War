@@ -346,7 +346,10 @@ var conquest_power_army: Dictionary = {}  # AI power id -> army level (feeds aut
 var conquest_last_round_log: Array = []   # [{power, kind, territory, won}] for the round report
 var conquest_last_fought: String = ""     # territory of the last tactical battle (map re-focus)
 var conquest_difficulty: String = "normal"  # scales the rival powers' strategic AI
+var conquest_truce: Dictionary = {}       # rival power id -> rounds of non-aggression remaining
 const NEUTRAL := "neutral"
+const CONQ_TRUCE_COST := 4                 # resource cost to broker a truce
+const CONQ_TRUCE_ROUNDS := 5               # how many rounds a truce holds
 # Strategic economy: owned territories earn strength each round, spent on a
 # global army level (+attack in battles), fortifying frontier regions (defenders
 # entrench when you hold them), development tracks (permanent army-wide edges),
@@ -407,6 +410,7 @@ func start_conquest(id: String) -> void:
 	conquest_last_round_log = []
 	conquest_last_fought = ""
 	conquest_difficulty = difficulty   # inherit the globally-selected difficulty
+	conquest_truce = {}
 	conquest_strength = CONQ_START_STRENGTH
 	conquest_fortify = {}
 	conquest_army = 0
@@ -438,6 +442,7 @@ func clear_conquest() -> void:
 	conquest_power_army = {}
 	conquest_last_round_log = []
 	conquest_last_fought = ""
+	conquest_truce = {}
 	conquest_strength = 0
 	conquest_fortify = {}
 	conquest_army = 0
@@ -600,6 +605,8 @@ func _territory_attackable_by(pid: String, tid: String) -> bool:
 func territory_attackable(tid: String) -> bool:
 	if not conquest_defense_queue.is_empty() or conquest_player_attacked:
 		return false
+	if at_truce(String(conquest_owner.get(tid, ""))):
+		return false   # can't attack a power you're at truce with
 	return _territory_attackable_by(player_power_id, tid)
 
 # --- Deterministic auto-resolution (AI-vs-AI battles never open a scene) ---
@@ -650,6 +657,8 @@ func _ai_pick_target(pid: String) -> Dictionary:
 		if not _territory_attackable_by(pid, tid):
 			continue
 		var d := String(conquest_owner.get(tid, ""))
+		if d == player_power_id and at_truce(pid):
+			continue   # honouring a truce with the player
 		var margin := _est_strength(pid, tid, false) - _est_strength(d, tid, true)
 		if margin < _conq_ai_margin_min():
 			continue   # only launch winnable-enough attacks (threshold scales with difficulty)
@@ -681,6 +690,26 @@ func set_conquest_difficulty(d: String) -> void:
 	if in_conquest():
 		conquest_difficulty = d
 		save_conquest()
+
+# --- Diplomacy: player-brokered truces (mutual non-aggression for N rounds) ---
+func at_truce(pid: String) -> bool:
+	return int(conquest_truce.get(pid, 0)) > 0
+
+func truce_rounds(pid: String) -> int:
+	return int(conquest_truce.get(pid, 0))
+
+func can_offer_truce(pid: String) -> bool:
+	return in_conquest() and pid != player_power_id and pid != NEUTRAL and pid != "" \
+		and not _is_eliminated(pid) and not at_truce(pid) \
+		and conquest_defense_queue.is_empty() and conquest_strength >= CONQ_TRUCE_COST
+
+func offer_truce(pid: String) -> bool:
+	if not can_offer_truce(pid):
+		return false
+	conquest_strength -= CONQ_TRUCE_COST
+	conquest_truce[pid] = CONQ_TRUCE_ROUNDS
+	save_conquest()
+	return true
 
 func _ai_spend(pid: String) -> void:
 	if int(conquest_power_army.get(pid, 0)) < _conq_ai_army_max() and int(conquest_treasury.get(pid, 0)) >= CONQ_AI_ARMY_COST:
@@ -747,6 +776,13 @@ func advance_conquest_round() -> bool:
 			_grant_income(pid)
 	conquest_player_attacked = false
 	conquest_secured = {}          # repel immunity lasts only the round it was earned
+	# Truces count down and lapse.
+	var truces := {}
+	for pid in conquest_truce:
+		var r := int(conquest_truce[pid]) - 1
+		if r > 0:
+			truces[pid] = r
+	conquest_truce = truces
 	conquest_round += 1
 	_update_victory_state()
 	save_conquest()
@@ -1078,6 +1114,7 @@ func save_conquest() -> void:
 		"last_round_log": conquest_last_round_log,
 		"last_fought": conquest_last_fought,
 		"difficulty": conquest_difficulty,
+		"truce": conquest_truce,
 		"strength": conquest_strength,
 		"fortify": conquest_fortify,
 		"army": conquest_army,
@@ -1121,6 +1158,7 @@ func load_conquest() -> bool:
 	conquest_last_round_log = parsed.get("last_round_log", [])
 	conquest_last_fought = String(parsed.get("last_fought", ""))
 	conquest_difficulty = String(parsed.get("difficulty", "normal"))
+	conquest_truce = parsed.get("truce", {})
 	conquest_strength = int(parsed.get("strength", 0))
 	conquest_fortify = parsed.get("fortify", {})
 	conquest_army = int(parsed.get("army", 0))
