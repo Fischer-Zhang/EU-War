@@ -174,11 +174,18 @@ func _offer_truce(pid: String) -> void:
 	_refresh()
 
 func _build_round_log(pos: Vector2) -> void:
+	var y := pos.y
+	# Historical event banner (if one fired last round).
+	var evt: Dictionary = GameState.conquest_last_event
+	if not evt.is_empty():
+		_label("★ %s:%s" % [String(evt.get("name", "")), String(evt.get("text", ""))],
+			Vector2(pos.x, y), 14, Color(0.95, 0.85, 0.45))
+		y += 26
 	var log_lines: Array = GameState.conquest_last_round_log
 	if log_lines.is_empty():
 		return
-	_label("上回合列強動向", pos, 15, Color(0.8, 0.83, 0.88))
-	var y := pos.y + 24
+	_label("上回合列強動向", Vector2(pos.x, y), 15, Color(0.8, 0.83, 0.88))
+	y += 24
 	var shown := 0
 	for e in log_lines:
 		if shown >= 8:

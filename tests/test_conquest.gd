@@ -218,6 +218,32 @@ func _run() -> void:
 		"can attack again once the truce lapses")
 	gs.delete_conquest_save()
 
+	# --- Historical events (deterministic, player-only) ---
+	gs.start_conquest("test_arena")
+	gs.conquest_strength = 10
+	gs._apply_event({"kind": "resource", "amount": 5})
+	ok(gs.conquest_strength == 15, "resource event adds resources")
+	gs._apply_event({"kind": "resource", "amount": -100})
+	ok(gs.conquest_strength == 0, "resource loss floors at zero")
+	var er0 = gs.conquest_roster.size()
+	gs._apply_event({"kind": "recruit"})
+	ok(gs.conquest_roster.size() == er0 + 1, "recruit event adds a unit")
+	gs._apply_event({"kind": "prep", "prep": "recon"})
+	ok(gs.prep_active("recon"), "prep event grants a free preparation")
+	# Revolt turns a player RESOURCE neutral — never a city, so no event-caused defeat.
+	gs.start_conquest("test_arena")
+	gs._apply_event({"kind": "revolt"})
+	ok(String(gs.conquest_owner.get("b_mine", "")) == "neutral", "revolt turns a player resource neutral")
+	ok(String(gs.conquest_owner.get("b_cap", "")) == "blue" and not gs.conquest_lost(),
+		"revolt never takes a city (no event-caused defeat)")
+	# Deterministic: the same round springs the same event.
+	gs.start_conquest("test_arena"); gs.advance_conquest_round()
+	var ev1 = String(gs.conquest_last_event.get("id", ""))
+	gs.start_conquest("test_arena"); gs.advance_conquest_round()
+	var ev2 = String(gs.conquest_last_event.get("id", ""))
+	ok(ev1 == ev2, "events are deterministic across runs")
+	gs.delete_conquest_save()
+
 	# --- Real-battle conquest bonuses (army/fortify/training/barrage), multi-power ---
 	gs.start_conquest(qid)
 	gs.conquest_army = 2

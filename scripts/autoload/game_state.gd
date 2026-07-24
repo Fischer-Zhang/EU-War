@@ -347,9 +347,23 @@ var conquest_last_round_log: Array = []   # [{power, kind, territory, won}] for 
 var conquest_last_fought: String = ""     # territory of the last tactical battle (map re-focus)
 var conquest_difficulty: String = "normal"  # scales the rival powers' strategic AI
 var conquest_truce: Dictionary = {}       # rival power id -> rounds of non-aggression remaining
+var conquest_last_event: Dictionary = {}  # the historical event that fired last round (for the UI)
 const NEUTRAL := "neutral"
 const CONQ_TRUCE_COST := 4                 # resource cost to broker a truce
 const CONQ_TRUCE_ROUNDS := 5               # how many rounds a truce holds
+# Historical events: deterministic (keyed off the round, no RNG) and player-only,
+# so they add texture to the long game without disturbing the AI-vs-AI balance.
+const CONQ_EVENT_CHANCE := 35              # % of rounds that spring an event
+const CONQ_EVENTS := [
+	{"id": "harvest", "name": "豐收", "kind": "resource", "amount": 4, "text": "風調雨順,國庫充盈(資源 +4)。"},
+	{"id": "inheritance", "name": "聯姻繼承", "kind": "resource", "amount": 6, "text": "一紙婚約帶來大筆嫁妝(資源 +6)。"},
+	{"id": "volunteers", "name": "志願從軍", "kind": "recruit", "amount": 0, "text": "愛國熱潮為你添一支老練部隊。"},
+	{"id": "engineer", "name": "築城名匠", "kind": "fortify", "amount": 0, "text": "一座前線城市加築工事。"},
+	{"id": "munitions", "name": "軍火商", "kind": "prep", "prep": "barrage", "amount": 0, "text": "下場戰鬥敵軍開局遭砲擊。"},
+	{"id": "spies", "name": "間諜網", "kind": "prep", "prep": "recon", "amount": 0, "text": "下場戰鬥全軍視野 +1。"},
+	{"id": "plague", "name": "瘟疫", "kind": "resource", "amount": -4, "text": "瘟疫肆虐,稅收銳減(資源 −4)。"},
+	{"id": "revolt", "name": "地方叛亂", "kind": "revolt", "amount": 0, "text": "一塊資源領地脫離掌控。"},
+]
 # Strategic economy: owned territories earn strength each round, spent on a
 # global army level (+attack in battles), fortifying frontier regions (defenders
 # entrench when you hold them), development tracks (permanent army-wide edges),
@@ -411,6 +425,7 @@ func start_conquest(id: String) -> void:
 	conquest_last_fought = ""
 	conquest_difficulty = difficulty   # inherit the globally-selected difficulty
 	conquest_truce = {}
+	conquest_last_event = {}
 	conquest_strength = CONQ_START_STRENGTH
 	conquest_fortify = {}
 	conquest_army = 0
@@ -443,6 +458,7 @@ func clear_conquest() -> void:
 	conquest_last_round_log = []
 	conquest_last_fought = ""
 	conquest_truce = {}
+	conquest_last_event = {}
 	conquest_strength = 0
 	conquest_fortify = {}
 	conquest_army = 0
@@ -784,9 +800,60 @@ func advance_conquest_round() -> bool:
 			truces[pid] = r
 	conquest_truce = truces
 	conquest_round += 1
+	_maybe_fire_event()
 	_update_victory_state()
 	save_conquest()
 	return true
+
+# --- Historical events (deterministic, player-only) ---
+func _maybe_fire_event() -> void:
+	conquest_last_event = {}
+	if CONQ_EVENTS.is_empty():
+		return
+	if abs(hash("evt:%d" % conquest_round)) % 100 >= CONQ_EVENT_CHANCE:
+		return
+	var evt: Dictionary = CONQ_EVENTS[abs(hash("evtpick:%d" % conquest_round)) % CONQ_EVENTS.size()]
+	_apply_event(evt)
+	conquest_last_event = evt
+
+func _apply_event(evt: Dictionary) -> void:
+	match String(evt.get("kind", "")):
+		"resource":
+			conquest_strength = max(0, conquest_strength + int(evt.get("amount", 0)))
+		"recruit":
+			if conquest_roster.size() < CONQ_ROSTER_MAX:
+				conquest_roster.append({"type": _recruit_type(), "name": "義勇兵",
+					"xp": conquest_training * CONQ_TRAIN_XP, "rank": 0, "general": ""})
+		"prep":
+			conquest_prep[String(evt.get("prep", "recon"))] = true
+		"fortify":
+			_event_fortify()
+		"revolt":
+			_event_revolt()
+
+func _event_fortify() -> void:
+	var sup := conquest_supplied_for(player_power_id)
+	var best := ""
+	var best_f := CONQ_FORTIFY_MAX
+	for t in conquest_territories():
+		var tid := String(t.get("id", ""))
+		if String(conquest_owner.get(tid, "")) != player_power_id or not _is_city(t) or not sup.has(tid):
+			continue
+		var f := conquest_fortify_level(tid)
+		if f < best_f:
+			best_f = f
+			best = tid
+	if best != "":
+		conquest_fortify[best] = best_f + 1
+
+func _event_revolt() -> void:
+	# A player RESOURCE territory slips to neutral — never a city, so an event can
+	# never take your last city and cause defeat.
+	for t in conquest_territories():
+		var tid := String(t.get("id", ""))
+		if String(conquest_owner.get(tid, "")) == player_power_id and not _is_city(t):
+			conquest_owner[tid] = NEUTRAL
+			return
 
 func _grant_income(pid: String) -> void:
 	var inc := conquest_income_for(pid)
@@ -1115,6 +1182,7 @@ func save_conquest() -> void:
 		"last_fought": conquest_last_fought,
 		"difficulty": conquest_difficulty,
 		"truce": conquest_truce,
+		"last_event": conquest_last_event,
 		"strength": conquest_strength,
 		"fortify": conquest_fortify,
 		"army": conquest_army,
@@ -1159,6 +1227,7 @@ func load_conquest() -> bool:
 	conquest_last_fought = String(parsed.get("last_fought", ""))
 	conquest_difficulty = String(parsed.get("difficulty", "normal"))
 	conquest_truce = parsed.get("truce", {})
+	conquest_last_event = parsed.get("last_event", {})
 	conquest_strength = int(parsed.get("strength", 0))
 	conquest_fortify = parsed.get("fortify", {})
 	conquest_army = int(parsed.get("army", 0))
