@@ -230,6 +230,12 @@ func _run() -> void:
 	ok(gs.conquest_roster.size() == er0 + 1, "recruit event adds a unit")
 	gs._apply_event({"kind": "prep", "prep": "recon"})
 	ok(gs.prep_active("recon"), "prep event grants a free preparation")
+	# promote ranks up a veteran; disband removes the greenest unit.
+	gs.conquest_roster = [{"type": "musketeers", "name": "a", "xp": 0, "rank": 0, "general": ""}]
+	gs._apply_event({"kind": "promote"})
+	ok(int(gs.conquest_roster[0].get("rank", 0)) == 1, "promote event ranks up a veteran")
+	gs._apply_event({"kind": "disband"})
+	ok(gs.conquest_roster.is_empty(), "disband event removes a unit")
 	# Revolt turns a player RESOURCE neutral — never a city, so no event-caused defeat.
 	gs.start_conquest("test_arena")
 	gs._apply_event({"kind": "revolt"})

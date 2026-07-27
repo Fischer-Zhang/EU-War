@@ -363,6 +363,10 @@ const CONQ_EVENTS := [
 	{"id": "spies", "name": "間諜網", "kind": "prep", "prep": "recon", "amount": 0, "text": "下場戰鬥全軍視野 +1。"},
 	{"id": "plague", "name": "瘟疫", "kind": "resource", "amount": -4, "text": "瘟疫肆虐,稅收銳減(資源 −4)。"},
 	{"id": "revolt", "name": "地方叛亂", "kind": "revolt", "amount": 0, "text": "一塊資源領地脫離掌控。"},
+	{"id": "silver", "name": "新大陸白銀", "kind": "resource", "amount": 8, "text": "新大陸白銀運抵,國庫暴增(資源 +8)。"},
+	{"id": "famine", "name": "饑荒", "kind": "resource", "amount": -5, "text": "歉收饑荒,民生凋敝(資源 −5)。"},
+	{"id": "drillmaster", "name": "名將操練", "kind": "promote", "amount": 0, "text": "名將投效,一支老兵晉升一階。"},
+	{"id": "mutiny", "name": "傭兵譁變", "kind": "disband", "amount": 0, "text": "欠餉譁變,一支部隊譁散(失去名冊中最生嫩的一支)。"},
 ]
 # Strategic economy: owned territories earn strength each round, spent on a
 # global army level (+attack in battles), fortifying frontier regions (defenders
@@ -830,6 +834,14 @@ func _apply_event(evt: Dictionary) -> void:
 			_event_fortify()
 		"revolt":
 			_event_revolt()
+		"promote":
+			var pi := _lowest_rank_idx()
+			if pi >= 0 and int(conquest_roster[pi].get("rank", 0)) < ROSTER_RANK_MAX:
+				conquest_roster[pi]["rank"] = int(conquest_roster[pi].get("rank", 0)) + 1
+		"disband":
+			var di := _lowest_rank_idx()   # lose the greenest unit — a bounded setback
+			if di >= 0:
+				conquest_roster.remove_at(di)
 
 func _event_fortify() -> void:
 	var sup := conquest_supplied_for(player_power_id)
