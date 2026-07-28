@@ -1,0 +1,483 @@
+{
+  "id": "32_zenta_1697",
+  "title": "岑塔 1697",
+  "era": "大土耳其戰爭",
+  "briefing": "大土耳其戰爭。歐根親王急行軍趕至提薩河畔,趁鄂圖曼大軍半渡、輜重壅塞於橋頭時發動突襲。以野砲封鎖渡口、騎兵合圍,將背水的鄂圖曼軍殲滅於河灣——一戰奠定哈布斯堡在匈牙利的霸權。",
+  "map": {
+    "width": 20,
+    "height": 13,
+    "tiles": [
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "field",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "marsh",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "field",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "field",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "marsh",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river",
+        "river"
+      ]
+    ]
+  },
+  "factions": [
+    {
+      "id": "holy_league",
+      "name": "神聖同盟軍",
+      "color": "#c9b037",
+      "controller": "player",
+      "posture": "aggressive"
+    },
+    {
+      "id": "ottoman",
+      "name": "鄂圖曼",
+      "color": "#1f9e8f",
+      "controller": "ai",
+      "posture": "defensive"
+    }
+  ],
+  "units": [
+    {
+      "faction": "holy_league",
+      "type": "musketeers",
+      "name": "帝國火槍",
+      "at": [
+        3,
+        5
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "musketeers",
+      "name": "帝國火槍",
+      "at": [
+        3,
+        7
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "heavy_cavalry",
+      "name": "帝國胸甲騎",
+      "at": [
+        4,
+        2
+      ],
+      "general": "eugene_of_savoy"
+    },
+    {
+      "faction": "holy_league",
+      "type": "heavy_cavalry",
+      "name": "帝國胸甲騎",
+      "at": [
+        4,
+        10
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "field_cannon",
+      "name": "帝國野砲",
+      "at": [
+        1,
+        5
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "field_cannon",
+      "name": "帝國野砲",
+      "at": [
+        1,
+        7
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "pikemen",
+      "name": "帝國長矛",
+      "at": [
+        4,
+        6
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "dragoons",
+      "name": "帝國龍騎",
+      "at": [
+        3,
+        9
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "arquebusiers",
+      "name": "禁衛軍火槍",
+      "at": [
+        14,
+        4
+      ],
+      "general": "koprulu",
+      "dig_in": 1
+    },
+    {
+      "faction": "ottoman",
+      "type": "arquebusiers",
+      "name": "禁衛軍火槍",
+      "at": [
+        14,
+        6
+      ],
+      "dig_in": 1
+    },
+    {
+      "faction": "ottoman",
+      "type": "arquebusiers",
+      "name": "禁衛軍火槍",
+      "at": [
+        14,
+        8
+      ],
+      "dig_in": 1
+    },
+    {
+      "faction": "ottoman",
+      "type": "light_cavalry",
+      "name": "西帕希輕騎",
+      "at": [
+        15,
+        3
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "light_cavalry",
+      "name": "西帕希輕騎",
+      "at": [
+        15,
+        9
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "heavy_cavalry",
+      "name": "西帕希重騎",
+      "at": [
+        13,
+        5
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "field_cannon",
+      "name": "鄂圖曼重砲",
+      "at": [
+        15,
+        6
+      ]
+    }
+  ],
+  "victory": {
+    "holy_league": {
+      "type": "eliminate",
+      "by_turn": 99
+    },
+    "ottoman": {
+      "type": "eliminate",
+      "by_turn": 99
+    }
+  },
+  "secondary_objectives": [
+    {
+      "id": "ford",
+      "type": "hold_hex",
+      "at": [
+        15,
+        6
+      ],
+      "name": "封鎖渡口"
+    },
+    {
+      "id": "guns",
+      "type": "eliminate_type",
+      "unit_type": "field_cannon",
+      "name": "奪取鄂圖曼重砲"
+    }
+  ]
+}

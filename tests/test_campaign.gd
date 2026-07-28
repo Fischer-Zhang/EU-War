@@ -52,6 +52,9 @@ func _run() -> void:
 		"07_rocroi_1643",
 		"28_marston_moor_1644",
 		"29_naseby_1645",
+		"30_st_gotthard_1664",
+		"31_vienna_1683",
+		"32_zenta_1697",
 		"11_narva_1700",
 		"08_blenheim_1704",
 		"19_ramillies_1706",
@@ -67,7 +70,7 @@ func _run() -> void:
 		"18_kunersdorf_1759",
 	]
 	var grand_scens: Array = dl.get_campaign("grand_campaign").get("scenarios", [])
-	ok(grand_scens == expected_grand, "grand campaign contains all 28 battles in chronological order")
+	ok(grand_scens == expected_grand, "grand campaign contains all 31 battles in chronological order")
 	var historical_count := 0
 	for scenario in dl.scenarios:
 		if String(scenario.get("id", "")) not in ["00_tutorial", "10_sandbox"]:

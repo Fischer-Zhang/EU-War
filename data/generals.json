@@ -165,5 +165,24 @@
     "attack_bonus": 1,
     "defense_bonus": 1,
     "description_zh": "新模範軍統帥,火槍與長矛陣線堅實。"
+  },
+  "jan_sobieski": {
+    "name_zh": "索別斯基",
+    "nation_zh": "波蘭",
+    "quality": "gold",
+    "era": "大土耳其戰爭",
+    "applies_to": ["heavy_cavalry"],
+    "attack_bonus": 3,
+    "description_zh": "維也納的解圍者,波蘭翼騎兵的雷霆衝鋒無堅不摧。"
+  },
+  "koprulu": {
+    "name_zh": "科普魯律",
+    "nation_zh": "鄂圖曼",
+    "quality": "silver",
+    "era": "大土耳其戰爭",
+    "applies_to": ["arquebusiers", "light_cavalry"],
+    "attack_bonus": 1,
+    "defense_bonus": 1,
+    "description_zh": "鄂圖曼大維齊爾,禁衛軍火槍與西帕希騎兵的統帥。"
   }
 }

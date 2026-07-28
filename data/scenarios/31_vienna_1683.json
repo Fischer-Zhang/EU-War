@@ -1,0 +1,484 @@
+{
+  "id": "31_vienna_1683",
+  "title": "維也納 1683",
+  "era": "大土耳其戰爭",
+  "briefing": "大土耳其戰爭。維也納被圍兩月將陷,索別斯基的波蘭翼騎兵與帝國聯軍自卡倫山居高衝下,直撲卡拉·穆斯塔法的鄂圖曼圍城營壘。以史上最大規模的騎兵衝鋒碾碎據壕的禁衛軍,為維也納解圍。",
+  "map": {
+    "width": 20,
+    "height": 13,
+    "tiles": [
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "forest",
+        "forest",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "hills",
+        "hills",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "hills",
+        "hills",
+        "hills",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "hills",
+        "hills",
+        "hills",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "hills",
+        "hills",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "hills",
+        "hills",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "town",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "forest",
+        "forest",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain"
+      ]
+    ]
+  },
+  "factions": [
+    {
+      "id": "holy_league",
+      "name": "神聖同盟軍",
+      "color": "#c9b037",
+      "controller": "player",
+      "posture": "aggressive"
+    },
+    {
+      "id": "ottoman",
+      "name": "鄂圖曼",
+      "color": "#1f9e8f",
+      "controller": "ai",
+      "posture": "defensive"
+    }
+  ],
+  "units": [
+    {
+      "faction": "holy_league",
+      "type": "heavy_cavalry",
+      "name": "波蘭翼騎兵",
+      "at": [
+        3,
+        2
+      ],
+      "general": "jan_sobieski"
+    },
+    {
+      "faction": "holy_league",
+      "type": "heavy_cavalry",
+      "name": "帝國胸甲騎",
+      "at": [
+        3,
+        10
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "musketeers",
+      "name": "帝國火槍",
+      "at": [
+        4,
+        4
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "musketeers",
+      "name": "帝國火槍",
+      "at": [
+        4,
+        6
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "musketeers",
+      "name": "薩克森火槍",
+      "at": [
+        4,
+        8
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "pikemen",
+      "name": "帝國長矛",
+      "at": [
+        5,
+        5
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "field_cannon",
+      "name": "帝國野砲",
+      "at": [
+        1,
+        6
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "light_cavalry",
+      "name": "波蘭輕騎",
+      "at": [
+        5,
+        11
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "arquebusiers",
+      "name": "禁衛軍火槍",
+      "at": [
+        13,
+        4
+      ],
+      "general": "koprulu",
+      "dig_in": 1
+    },
+    {
+      "faction": "ottoman",
+      "type": "arquebusiers",
+      "name": "禁衛軍火槍",
+      "at": [
+        13,
+        8
+      ],
+      "dig_in": 1
+    },
+    {
+      "faction": "ottoman",
+      "type": "musketeers",
+      "name": "精銳禁衛軍",
+      "at": [
+        14,
+        6
+      ],
+      "dig_in": 2
+    },
+    {
+      "faction": "ottoman",
+      "type": "light_cavalry",
+      "name": "西帕希輕騎",
+      "at": [
+        12,
+        2
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "light_cavalry",
+      "name": "韃靼輕騎",
+      "at": [
+        12,
+        10
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "heavy_cavalry",
+      "name": "西帕希重騎",
+      "at": [
+        15,
+        9
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "field_cannon",
+      "name": "攻城砲",
+      "at": [
+        14,
+        3
+      ],
+      "dig_in": 1
+    }
+  ],
+  "victory": {
+    "holy_league": {
+      "type": "eliminate",
+      "by_turn": 99
+    },
+    "ottoman": {
+      "type": "eliminate",
+      "by_turn": 99
+    }
+  },
+  "secondary_objectives": [
+    {
+      "id": "relieve",
+      "type": "hold_hex",
+      "at": [
+        16,
+        6
+      ],
+      "name": "解圍維也納"
+    },
+    {
+      "id": "guns",
+      "type": "eliminate_type",
+      "unit_type": "field_cannon",
+      "name": "摧毀攻城砲"
+    }
+  ]
+}

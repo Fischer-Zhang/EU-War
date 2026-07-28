@@ -1,0 +1,474 @@
+{
+  "id": "30_st_gotthard_1664",
+  "title": "聖哥達 1664",
+  "era": "大土耳其戰爭",
+  "briefing": "大土耳其戰爭。鄂圖曼大軍強渡拉布河,蒙特庫科利的帝國-同盟軍撲向立足未穩的鄂圖曼橋頭堡——背水一戰的禁衛軍據壕死守,同盟軍以火槍陣與胸甲騎兵猛攻,將其逼回河中。以工兵拆壕、騎兵包抄,把敵軍釘死在拉布河畔。",
+  "map": {
+    "width": 20,
+    "height": 13,
+    "tiles": [
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "field",
+        "field",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "field",
+        "field",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "field",
+        "field",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ],
+      [
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "plain",
+        "river",
+        "river"
+      ]
+    ]
+  },
+  "factions": [
+    {
+      "id": "holy_league",
+      "name": "神聖同盟軍",
+      "color": "#c9b037",
+      "controller": "player",
+      "posture": "aggressive"
+    },
+    {
+      "id": "ottoman",
+      "name": "鄂圖曼",
+      "color": "#1f9e8f",
+      "controller": "ai",
+      "posture": "defensive"
+    }
+  ],
+  "units": [
+    {
+      "faction": "holy_league",
+      "type": "musketeers",
+      "name": "帝國火槍",
+      "at": [
+        3,
+        4
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "musketeers",
+      "name": "帝國火槍",
+      "at": [
+        3,
+        6
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "musketeers",
+      "name": "法蘭西火槍",
+      "at": [
+        3,
+        8
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "pikemen",
+      "name": "帝國長矛",
+      "at": [
+        4,
+        5
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "pikemen",
+      "name": "帝國長矛",
+      "at": [
+        4,
+        7
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "heavy_cavalry",
+      "name": "帝國胸甲騎",
+      "at": [
+        4,
+        2
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "heavy_cavalry",
+      "name": "帝國胸甲騎",
+      "at": [
+        4,
+        10
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "field_cannon",
+      "name": "帝國野砲",
+      "at": [
+        1,
+        6
+      ]
+    },
+    {
+      "faction": "holy_league",
+      "type": "pioneers",
+      "name": "工兵",
+      "at": [
+        2,
+        9
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "arquebusiers",
+      "name": "禁衛軍火槍",
+      "at": [
+        15,
+        4
+      ],
+      "general": "koprulu",
+      "dig_in": 1
+    },
+    {
+      "faction": "ottoman",
+      "type": "arquebusiers",
+      "name": "禁衛軍火槍",
+      "at": [
+        15,
+        6
+      ],
+      "dig_in": 1
+    },
+    {
+      "faction": "ottoman",
+      "type": "arquebusiers",
+      "name": "禁衛軍火槍",
+      "at": [
+        15,
+        8
+      ],
+      "dig_in": 1
+    },
+    {
+      "faction": "ottoman",
+      "type": "light_cavalry",
+      "name": "西帕希輕騎",
+      "at": [
+        16,
+        3
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "light_cavalry",
+      "name": "阿金吉輕騎",
+      "at": [
+        16,
+        9
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "heavy_cavalry",
+      "name": "西帕希重騎",
+      "at": [
+        16,
+        6
+      ]
+    },
+    {
+      "faction": "ottoman",
+      "type": "field_cannon",
+      "name": "鄂圖曼重砲",
+      "at": [
+        17,
+        5
+      ]
+    }
+  ],
+  "victory": {
+    "holy_league": {
+      "type": "eliminate",
+      "by_turn": 99
+    },
+    "ottoman": {
+      "type": "eliminate",
+      "by_turn": 99
+    }
+  }
+}
