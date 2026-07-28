@@ -73,9 +73,16 @@ func _conquest_header(scenario: Dictionary) -> String:
 	# On a defence the sides are mirrored: you command the scenario's OTHER faction,
 	# so the briefing prose (written from the protagonist's view) may not match your
 	# role — spell out which side you hold.
+	var head := ""
 	if defending:
-		return "[b][color=#e0993f]敵軍反攻——你指揮「%s」據守此地(攻守鏡像)。[/color][/b]\n\n" % you_name
-	return "[b][color=#7fd08f]進攻——你指揮「%s」奪取此地。[/color][/b]\n\n" % you_name
+		head = "[b][color=#e0993f]敵軍反攻——你指揮「%s」據守此地(攻守鏡像)。[/color][/b]\n" % you_name
+	else:
+		head = "[b][color=#7fd08f]進攻——你指揮「%s」奪取此地。[/color][/b]\n" % you_name
+	# Multi-front fatigue warning: this army has already fought this round.
+	var fatigue: int = GameState.conquest_battles_this_round
+	if fatigue > 0:
+		head += "[color=#e07070]⚠ 部隊疲憊:本回合第 %d 戰,開局壓制、士氣下滑(回合間才休整)。[/color]\n" % (fatigue + 1)
+	return head + "\n"
 
 func _compose(scenario: Dictionary) -> String:
 	var lines := []

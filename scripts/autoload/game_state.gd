@@ -369,6 +369,7 @@ var conquest_last_fought: String = ""     # territory of the last tactical battl
 var conquest_difficulty: String = "normal"  # scales the rival powers' strategic AI
 var conquest_truce: Dictionary = {}       # rival power id -> rounds of non-aggression remaining
 var conquest_last_event: Dictionary = {}  # the historical event that fired last round (for the UI)
+var conquest_battles_this_round: int = 0   # battles the player's army has fought this round (multi-front fatigue)
 const NEUTRAL := "neutral"
 const CONQ_TRUCE_COST := 4                 # resource cost to broker a truce
 const CONQ_TRUCE_ROUNDS := 5               # how many rounds a truce holds
@@ -451,6 +452,7 @@ func start_conquest(id: String) -> void:
 	conquest_difficulty = difficulty   # inherit the globally-selected difficulty
 	conquest_truce = {}
 	conquest_last_event = {}
+	conquest_battles_this_round = 0
 	conquest_strength = CONQ_START_STRENGTH
 	conquest_fortify = {}
 	conquest_army = 0
@@ -484,6 +486,7 @@ func clear_conquest() -> void:
 	conquest_last_fought = ""
 	conquest_truce = {}
 	conquest_last_event = {}
+	conquest_battles_this_round = 0
 	conquest_strength = 0
 	conquest_fortify = {}
 	conquest_army = 0
@@ -817,6 +820,7 @@ func advance_conquest_round() -> bool:
 			_grant_income(pid)
 	conquest_player_attacked = false
 	conquest_secured = {}          # repel immunity lasts only the round it was earned
+	conquest_battles_this_round = 0  # the army regroups between rounds — fatigue clears
 	# Truces count down and lapse.
 	var truces := {}
 	for pid in conquest_truce:
@@ -966,6 +970,7 @@ func resolve_conquest_battle(player_won: bool) -> void:
 		if player_won:
 			conquest_owner[tid] = player_power_id
 			conqueror = player_power_id
+	conquest_battles_this_round += 1   # the army tires as it fights more fronts this round
 	_check_eliminations(conqueror)
 	_update_victory_state()
 	save_conquest()
@@ -1216,6 +1221,7 @@ func save_conquest() -> void:
 		"difficulty": conquest_difficulty,
 		"truce": conquest_truce,
 		"last_event": conquest_last_event,
+		"battles_this_round": conquest_battles_this_round,
 		"strength": conquest_strength,
 		"fortify": conquest_fortify,
 		"army": conquest_army,
@@ -1261,6 +1267,7 @@ func load_conquest() -> bool:
 	conquest_difficulty = String(parsed.get("difficulty", "normal"))
 	conquest_truce = parsed.get("truce", {})
 	conquest_last_event = parsed.get("last_event", {})
+	conquest_battles_this_round = int(parsed.get("battles_this_round", 0))
 	conquest_strength = int(parsed.get("strength", 0))
 	conquest_fortify = parsed.get("fortify", {})
 	conquest_army = int(parsed.get("army", 0))

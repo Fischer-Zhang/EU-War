@@ -250,6 +250,15 @@ func _run() -> void:
 	ok(ev1 == ev2, "events are deterministic across runs")
 	gs.delete_conquest_save()
 
+	# --- Multi-front fatigue counter ---
+	gs.start_conquest("test_arena")
+	ok(gs.conquest_battles_this_round == 0, "fatigue counter starts at zero")
+	gs.begin_conquest_attack("r_cap"); gs.resolve_conquest_battle(true)
+	ok(gs.conquest_battles_this_round == 1, "each battle increments the fatigue counter")
+	gs.advance_conquest_round()
+	ok(gs.conquest_battles_this_round == 0, "fatigue clears between rounds")
+	gs.delete_conquest_save()
+
 	# --- Real-battle conquest bonuses (army/fortify/training/barrage), multi-power ---
 	gs.start_conquest(qid)
 	gs.conquest_army = 2
@@ -257,6 +266,7 @@ func _run() -> void:
 	gs.conquest_training = 1
 	gs.conquest_prep = {"barrage": true}
 	gs.conquest_power_army["red"] = 3   # a strong rival fields tougher troops
+	gs.conquest_battles_this_round = 2  # already fought two fronts this round -> fatigue
 	gs.conquest_defense_queue = [{"attacker": "red", "territory": "b_cap"}]
 	gs.begin_conquest_defense()
 	var b = load("res://scenes/battle.tscn").instantiate()
@@ -287,6 +297,7 @@ func _run() -> void:
 			if int(e.get("self_mods", {}).get("attack", 0)) >= 3:
 				enemy_army_buff = true
 	ok(enemy_army_buff, "the rival power's army level buffs its tactical force")
+	ok(sample != null and sample.suppression >= 4, "multi-front fatigue starts the player's army suppressed (supp %d)" % (sample.suppression if sample else -1))
 	# Battle factions are relabelled to the actual powers fighting.
 	ok(String(b.factions.get(b.player_faction, {}).get("name", "")) == String(gs.conquest_power(gs.player_power_id).get("name", "")),
 		"battle shows the player's real power name (%s)" % String(b.factions.get(b.player_faction, {}).get("name", "")))
