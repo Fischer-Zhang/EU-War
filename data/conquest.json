@@ -332,9 +332,9 @@
         "name": "奧地利",
         "owner": "habsburg",
         "type": "city",
+        "scenario": "31_vienna_1683",
         "x": 0.49,
         "y": 0.41,
-        "scenario": "20_oudenarde_1708",
         "links": [
           "bavaria",
           "bohemia",
@@ -384,7 +384,7 @@
         "type": "city",
         "x": 0.55,
         "y": 0.43,
-        "scenario": "23_hohenfriedberg_1745",
+        "scenario": "30_st_gotthard_1664",
         "links": [
           "austria",
           "silesia",
@@ -598,7 +598,7 @@
         "type": "resource",
         "x": 0.55,
         "y": 0.5,
-        "scenario": "09_poltava_1709",
+        "scenario": "32_zenta_1697",
         "links": [
           "hungary",
           "greece",
