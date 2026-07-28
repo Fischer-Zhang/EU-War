@@ -100,6 +100,7 @@ func _ready() -> void:
 	if scenario.is_empty():
 		scenario = DataLoader.get_scenario(DEFAULT_SCENARIO)
 	scenario = GameState.apply_roster(scenario)
+	scenario = GameState.apply_conquest_faction_labels(scenario)
 	_setup_scenario()
 	_connect_ui()
 	turn_manager = TurnManager.new()
@@ -1003,6 +1004,13 @@ func _apply_conquest_bonuses() -> void:
 	var recon: bool = GameState.prep_active("recon")
 	var supply: bool = GameState.prep_active("supply")
 	var barrage: bool = GameState.prep_active("barrage")
+	# The rival power's strategic army level buffs ITS tactical force too — a big,
+	# well-mustered empire fields tougher troops (mirrors the player's army bonus),
+	# so fighting a strong power is genuinely harder than fighting a weak one.
+	var atk := String(GameState.conquest_battle.get("attacker", ""))
+	var dfd := String(GameState.conquest_battle.get("defender", ""))
+	var enemy_pid: String = dfd if atk == GameState.player_power_id else atk
+	var enemy_army: int = int(GameState.conquest_power_army.get(enemy_pid, 0))
 	for u in units:
 		if u.faction_id == player_faction:
 			if army > 0:
@@ -1020,6 +1028,8 @@ func _apply_conquest_bonuses() -> void:
 				u.add_suppression(3)
 				u.morale = max(1, u.morale - 3)
 		else:
+			if enemy_army > 0:
+				u.active_effects.append({"self_mods": {"attack": enemy_army}})
 			if enemy_fort > 0:
 				u.dig_in_level = max(u.dig_in_level, min(enemy_fort, Unit.MAX_DIG_IN))
 			if barrage:

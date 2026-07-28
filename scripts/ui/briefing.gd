@@ -16,6 +16,7 @@ func _ready() -> void:
 	# In a campaign, the player force is the carried roster, not the scenario's
 	# default one — reflect that in the order of battle shown here.
 	scenario = GameState.apply_roster(scenario)
+	scenario = GameState.apply_conquest_faction_labels(scenario)
 	title_label.text = String(scenario.get("title", ""))
 	era_label.text = String(scenario.get("era", ""))
 	_build_side_picker(scenario)

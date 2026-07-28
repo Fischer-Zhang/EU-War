@@ -256,6 +256,7 @@ func _run() -> void:
 	gs.conquest_fortify["b_cap"] = 2
 	gs.conquest_training = 1
 	gs.conquest_prep = {"barrage": true}
+	gs.conquest_power_army["red"] = 3   # a strong rival fields tougher troops
 	gs.conquest_defense_queue = [{"attacker": "red", "territory": "b_cap"}]
 	gs.begin_conquest_defense()
 	var b = load("res://scenes/battle.tscn").instantiate()
@@ -280,6 +281,15 @@ func _run() -> void:
 	ok(sample != null and sample.xp >= gs.CONQ_TRAIN_XP, "training grants start XP (xp %d)" % (sample.xp if sample else -1))
 	ok(enemy_sample != null and (enemy_sample.suppression > 0 or enemy_sample.hp < enemy_sample.max_hp),
 		"barrage prep softens the enemy")
+	var enemy_army_buff := false
+	if enemy_sample != null:
+		for e in enemy_sample.active_effects:
+			if int(e.get("self_mods", {}).get("attack", 0)) >= 3:
+				enemy_army_buff = true
+	ok(enemy_army_buff, "the rival power's army level buffs its tactical force")
+	# Battle factions are relabelled to the actual powers fighting.
+	ok(String(b.factions.get(b.player_faction, {}).get("name", "")) == String(gs.conquest_power(gs.player_power_id).get("name", "")),
+		"battle shows the player's real power name (%s)" % String(b.factions.get(b.player_faction, {}).get("name", "")))
 	b.queue_free()
 	await process_frame
 

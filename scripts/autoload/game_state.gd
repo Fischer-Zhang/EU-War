@@ -219,6 +219,27 @@ func apply_roster(scenario: Dictionary) -> Dictionary:
 	out["units"] = new_units
 	return out
 
+# Relabel a conquest battle's two factions with the ACTUAL powers fighting over
+# the territory (names + colours), so the briefing/battle read e.g. "法蘭西 vs
+# 鄂圖曼" instead of the neutral board scenario's own factions. Combat still keys
+# off the unchanged faction ids — only the display changes. No-op outside a
+# conquest battle. Call after apply_roster.
+func apply_conquest_faction_labels(scenario: Dictionary) -> Dictionary:
+	if not in_conquest() or conquest_battle.is_empty():
+		return scenario
+	var pf := resolve_player_faction(scenario)
+	var atk := String(conquest_battle.get("attacker", ""))
+	var dfd := String(conquest_battle.get("defender", ""))
+	var enemy_pid := dfd if atk == player_power_id else atk
+	var out := scenario.duplicate(true)
+	for f in out.get("factions", []):
+		var pid: String = player_power_id if String(f.get("id", "")) == pf else enemy_pid
+		var pw := conquest_power(pid)
+		if not pw.is_empty():
+			f["name"] = String(pw.get("name", f.get("name", "")))
+			f["color"] = String(pw.get("color", f.get("color", "")))
+	return out
+
 # ------------------------------------------------------------------ tech tree
 
 # Load the global progression pool from disk (or seed a fresh one). Only strings
