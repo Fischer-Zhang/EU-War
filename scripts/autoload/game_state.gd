@@ -370,6 +370,9 @@ var conquest_difficulty: String = "normal"  # scales the rival powers' strategic
 var conquest_truce: Dictionary = {}       # rival power id -> rounds of non-aggression remaining
 var conquest_last_event: Dictionary = {}  # the historical event that fired last round (for the UI)
 var conquest_battles_this_round: int = 0   # battles the player's army has fought this round (multi-front fatigue)
+# --- Battlefield armies (positioned units every power moves on the map) ---
+var conquest_armies: Array = []           # [{id, owner, location, strength, moved, roster}]
+var conquest_army_seq: Dictionary = {}    # power id -> next army sequence number
 const NEUTRAL := "neutral"
 const CONQ_TRUCE_COST := 4                 # resource cost to broker a truce
 const CONQ_TRUCE_ROUNDS := 5               # how many rounds a truce holds
@@ -417,6 +420,13 @@ const CONQ_HEAL_COST := 3                  # reinforce (rank up) the weakest ros
 const CONQ_ROSTER_MAX := 8
 const CONQ_AI_ARMY_COST := 4
 const CONQ_AI_ARMY_MAX := 4
+# Battlefield-army tunables.
+const CONQ_ARMY_STR_MAX := 4               # per-army strength cap
+const CONQ_ARMY_START_STR := 1             # strength of a synthesized/raised army
+const CONQ_GARRISON_CITY := 3              # standing garrison strength of an army-less city
+const CONQ_GARRISON_RESOURCE := 0          # army-less resource nodes fall to any adjacent army
+const CONQ_RAISE_COST := 5                 # raise a NEW army at a supplied city
+const CONQ_REINFORCE_COST := 4             # +1 strength (and a roster unit) to an army
 # Auto-resolve is LOCAL, not empire-wide: a power's strength at a front comes from
 # its army level and its territories massed AROUND that front, not its total size.
 # This stops the biggest empire steamrolling every border at once (anti-snowball).
@@ -466,6 +476,7 @@ func start_conquest(id: String) -> void:
 	for pid in _ai_powers_in_order():
 		conquest_treasury[pid] = CONQ_START_STRENGTH
 		conquest_power_army[pid] = 0
+	_synthesize_armies()   # place each power's starting armies on the map
 	save_conquest()   # a fresh conquest is immediately resumable
 
 func clear_conquest() -> void:
@@ -494,6 +505,8 @@ func clear_conquest() -> void:
 	conquest_training = 0
 	conquest_prep = {}
 	conquest_roster = []
+	conquest_armies = []
+	conquest_army_seq = {}
 
 func in_conquest() -> bool:
 	return conquest_id != ""
@@ -590,6 +603,71 @@ func _conquest_neighbors(tid: String) -> Array:
 # "supply": true). A territory is supplied for its owner if a chain of that
 # power's territories connects it back to a source; a territory cut off (e.g. by
 # an enemy severing the chain) earns no income and can't stage offensives.
+
+# --- Battlefield armies (CRUD + queries; positioned units on the map) ---
+func army_by_id(id: String) -> Dictionary:
+	for a in conquest_armies:
+		if String(a.get("id", "")) == id:
+			return a
+	return {}
+
+func armies_at(tid: String) -> Array:
+	var out: Array = []
+	for a in conquest_armies:
+		if String(a.get("location", "")) == tid:
+			out.append(a)
+	return out
+
+func armies_of(pid: String) -> Array:
+	var out: Array = []
+	for a in conquest_armies:
+		if String(a.get("owner", "")) == pid:
+			out.append(a)
+	return out
+
+func _create_army(owner: String, location: String, strength: int, roster: Array = []) -> Dictionary:
+	var seq := int(conquest_army_seq.get(owner, 0))
+	conquest_army_seq[owner] = seq + 1
+	var army := {
+		"id": "%s#%d" % [owner, seq],
+		"owner": owner,
+		"location": location,
+		"strength": clampi(strength, 1, CONQ_ARMY_STR_MAX),
+		"moved": false,
+		"roster": roster,
+	}
+	conquest_armies.append(army)
+	return army
+
+func _destroy_army(id: String) -> void:
+	for i in range(conquest_armies.size()):
+		if String(conquest_armies[i].get("id", "")) == id:
+			conquest_armies.remove_at(i)
+			return
+
+# Seed armies: from powers[].start_armies if present, else one per power on its
+# lowest-id owned city. Deterministic (data / id order).
+func _synthesize_armies() -> void:
+	conquest_armies = []
+	conquest_army_seq = {}
+	var placed := false
+	for p in conquest_powers:
+		for s in p.get("start_armies", []):
+			_create_army(String(p.get("id", "")), String(s.get("at", "")),
+				int(s.get("strength", CONQ_ARMY_START_STR)))
+			placed = true
+	if placed:
+		return
+	for pid in _all_powers():
+		if _is_eliminated(pid):
+			continue
+		var best := ""
+		for t in conquest_territories():
+			var tid := String(t.get("id", ""))
+			if String(conquest_owner.get(tid, "")) == pid and _is_city(t) and (best == "" or tid < best):
+				best = tid
+		if best != "":
+			_create_army(pid, best, CONQ_ARMY_START_STR)
 
 func conquest_supply_sources_for(pid: String) -> Array:
 	var out: Array = []
@@ -1222,6 +1300,8 @@ func save_conquest() -> void:
 		"truce": conquest_truce,
 		"last_event": conquest_last_event,
 		"battles_this_round": conquest_battles_this_round,
+		"armies": conquest_armies,
+		"army_seq": conquest_army_seq,
 		"strength": conquest_strength,
 		"fortify": conquest_fortify,
 		"army": conquest_army,
@@ -1275,6 +1355,10 @@ func load_conquest() -> bool:
 	conquest_training = int(parsed.get("training", 0))
 	conquest_prep = parsed.get("prep", {})
 	conquest_roster = parsed.get("roster", [])
+	conquest_armies = parsed.get("armies", [])
+	conquest_army_seq = parsed.get("army_seq", {})
+	if conquest_armies.is_empty():
+		_synthesize_armies()   # migrate a pre-armies save
 	conquest_battle = {}
 	player_faction_override = ""
 	return true

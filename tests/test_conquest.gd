@@ -61,6 +61,11 @@ func _run() -> void:
 	ok(not gs.conquest_over() and not gs.conquest_won() and not gs.conquest_lost(), "no result at start")
 	var pc0 = gs.conquest_power_counts()
 	ok(int(pc0["blue"]["cities"]) == 1 and int(pc0["red"]["cities"]) == 1, "each power starts with one city")
+	# Battlefield armies: one synthesized per power on its capital.
+	ok(gs.conquest_armies.size() == 3, "one army synthesized per power")
+	ok(gs.armies_at("b_cap").size() == 1 and String(gs.armies_at("b_cap")[0].get("owner", "")) == "blue",
+		"the player's army sits at its capital")
+	ok(gs.armies_of("red").size() == 1, "each rival power has an army too")
 
 	# --- Per-power supply + income ---
 	var bsup = gs.conquest_supplied_for("blue")
@@ -160,6 +165,7 @@ func _run() -> void:
 	gs.save_conquest()
 	ok(gs.has_conquest_save(), "conquest autosaves during play")
 	var owner_snap := _owners_snapshot(gs)
+	var army_ct: int = gs.conquest_armies.size()
 	gs.clear_conquest()
 	ok(not gs.in_conquest(), "cleared in-memory before load")
 	ok(gs.load_conquest(), "load_conquest restores a saved game")
@@ -167,6 +173,7 @@ func _run() -> void:
 	ok(_owners_snapshot(gs) == owner_snap, "ownership restored exactly")
 	ok(gs.conquest_strength == 17, "economy restored")
 	ok(gs._is_eliminated("red"), "elimination state restored")
+	ok(gs.conquest_armies.size() == army_ct and not gs.army_by_id("blue#0").is_empty(), "armies restored from save")
 	# A decided game removes its save (not resumable).
 	gs.start_conquest("test_arena")
 	gs.conquest_result = "won"
