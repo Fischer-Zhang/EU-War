@@ -112,9 +112,10 @@ func _build_hud() -> void:
 			_total_cities(), int(counts.get("powers_alive", 0))]
 
 	# Economy readout.
-	_label("資源 %d  ·  每回合 +%d  ·  軍備 Lv%d  ·  工業 Lv%d  ·  訓練 Lv%d" % [
+	_label("資源 %d  ·  每回合 +%d  ·  軍隊 %d  ·  工業 Lv%d  ·  訓練 Lv%d" % [
 		GameState.conquest_strength, GameState.conquest_income(),
-		GameState.conquest_army, GameState.conquest_industry, GameState.conquest_training],
+		GameState.armies_of(GameState.player_power_id).size(),
+		GameState.conquest_industry, GameState.conquest_training],
 		Vector2(28, 80), 15, Color(0.82, 0.86, 0.9))
 
 	_build_standings(Vector2(28, 106))
@@ -154,7 +155,7 @@ func _build_standings(pos: Vector2) -> void:
 
 func _build_difficulty(pos: Vector2) -> void:
 	# The rival powers' AI difficulty — set at the game's start, then locked in.
-	var editable: bool = GameState.conquest_round == 0 and not GameState.conquest_player_attacked \
+	var editable: bool = GameState.conquest_round == 0 \
 		and GameState.conquest_pending_defenses().is_empty() and not GameState.conquest_over()
 	_label("難度", pos, 14, Color(0.8, 0.83, 0.88))
 	var x := pos.x + 48

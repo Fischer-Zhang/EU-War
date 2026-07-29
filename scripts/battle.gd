@@ -987,7 +987,9 @@ func _apply_deploy_generals() -> void:
 func _apply_conquest_bonuses() -> void:
 	if not GameState.in_conquest():
 		return
-	var army: int = GameState.conquest_army
+	# The player's fielding army's strength buffs its own troops.
+	var fielding := GameState._battle_fielding_army()
+	var army: int = int(fielding.get("strength", 0)) if not fielding.is_empty() else 0
 	var training: int = GameState.conquest_training
 	var defense: bool = bool(GameState.conquest_battle.get("defense", false))
 	var territory := String(GameState.conquest_battle.get("territory", ""))
@@ -1004,18 +1006,10 @@ func _apply_conquest_bonuses() -> void:
 	var recon: bool = GameState.prep_active("recon")
 	var supply: bool = GameState.prep_active("supply")
 	var barrage: bool = GameState.prep_active("barrage")
-	# The rival power's strategic army level buffs ITS tactical force too — a big,
-	# well-mustered empire fields tougher troops (mirrors the player's army bonus),
-	# so fighting a strong power is genuinely harder than fighting a weak one.
-	var atk := String(GameState.conquest_battle.get("attacker", ""))
-	var dfd := String(GameState.conquest_battle.get("defender", ""))
-	var enemy_pid: String = dfd if atk == GameState.player_power_id else atk
-	var enemy_army: int = int(GameState.conquest_power_army.get(enemy_pid, 0))
-	# Multi-front fatigue: one army can't be fresh everywhere. Each battle already
-	# fought this round leaves the player's troops more worn (start suppressed and
-	# below full morale); they recover between rounds. Fighting on several fronts
-	# at once is therefore genuinely costly, not a free teleport.
-	var fatigue: int = GameState.conquest_battles_this_round
+	# The rival ARMY's strength buffs its tactical force — a bigger army fields
+	# tougher troops, so a strong army is genuinely harder to beat than a weak one.
+	var enemy := GameState.army_by_id(String(GameState.conquest_battle.get("enemy_army", "")))
+	var enemy_army: int = int(enemy.get("strength", 0)) if not enemy.is_empty() else 0
 	for u in units:
 		if u.faction_id == player_faction:
 			if army > 0:
@@ -1032,9 +1026,6 @@ func _apply_conquest_bonuses() -> void:
 			if cut_off:
 				u.add_suppression(3)
 				u.morale = max(1, u.morale - 3)
-			if fatigue > 0:
-				u.add_suppression(2 * fatigue)
-				u.morale = max(1, u.morale - 2 * fatigue)
 		else:
 			if enemy_army > 0:
 				u.active_effects.append({"self_mods": {"attack": enemy_army}})
