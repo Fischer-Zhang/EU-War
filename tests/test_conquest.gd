@@ -67,6 +67,25 @@ func _run() -> void:
 		"the player's army sits at its capital")
 	ok(gs.armies_of("red").size() == 1, "each rival power has an army too")
 
+	# --- Army combat + movement primitives ---
+	var ba: Dictionary = gs.army_by_id("blue#0")   # at b_cap, strength 1
+	ok(gs._army_attack_value(ba, "r_cap") <= gs._defense_value("r_cap"), "even armies: attacker repulsed (ties favour defender)")
+	ba["strength"] = 4
+	ok(gs._resolve_army_attack(ba, "r_cap"), "a strong army takes the city")
+	ok(String(gs.conquest_owner.get("r_cap", "")) == "blue" and String(ba.get("location", "")) == "r_cap", "winner captures and advances onto the tile")
+	ok(gs.armies_at("r_cap").size() == 1 and gs.army_by_id("red#0").is_empty(), "the defending army is destroyed")
+	# Garrison: an army-less city defends only with its garrison.
+	gs.start_conquest("test_arena")
+	gs._destroy_army("red#0")
+	var ba2: Dictionary = gs.army_by_id("blue#0"); ba2["strength"] = 4
+	ok(gs._resolve_army_attack(ba2, "r_cap"), "an army-less city (garrison only) falls to a strong army")
+	# Movement.
+	gs.start_conquest("test_arena")
+	ok(gs.can_move_army("blue#0", "b_mine"), "can move to an adjacent owned empty territory")
+	ok(not gs.can_move_army("blue#0", "r_cap"), "cannot move into enemy territory")
+	ok(gs.move_army("blue#0", "b_mine") and String(gs.army_by_id("blue#0").get("location", "")) == "b_mine", "move relocates the army")
+	ok(not gs.can_move_army("blue#0", "b_cap"), "an army that already acted cannot move again")
+
 	# --- Per-power supply + income ---
 	var bsup = gs.conquest_supplied_for("blue")
 	ok(bsup.has("b_cap") and bsup.has("b_mine"), "blue city supplies its linked resource")

@@ -669,6 +669,56 @@ func _synthesize_armies() -> void:
 		if best != "":
 			_create_army(pid, best, CONQ_ARMY_START_STR)
 
+# --- Army combat + movement (integer, deterministic, ties favour defender) ---
+# The successor of _est_strength/_auto_resolve, keyed to a positioned army. Local
+# strength philosophy unchanged: army strength + own supplied territories massed
+# around the front; the defender adds garrison/fortify/terrain + a home edge.
+func _army_attack_value(army: Dictionary, tid: String) -> int:
+	return int(army.get("strength", 1)) * AR_W_ARMY \
+		+ _adjacent_owned_supplied(String(army.get("owner", "")), tid) * AR_W_ADJ
+
+func _defense_value(tid: String) -> int:
+	var owner := String(conquest_owner.get(tid, ""))
+	var occ := armies_at(tid)
+	var base := 0
+	if not occ.is_empty():
+		base = int(occ[0].get("strength", 1)) * AR_W_ARMY + _adjacent_owned_supplied(owner, tid) * AR_W_ADJ
+	else:
+		base = CONQ_GARRISON_CITY if _is_city(conquest_territory(tid)) else CONQ_GARRISON_RESOURCE
+	return base + conquest_fortify_level(tid) * AR_W_FORT \
+		+ int(conquest_territory(tid).get("defense", 0)) + AR_W_DEFENDER
+
+# Auto-resolve an army's attack on a tile: on a win the defender army (if any) is
+# destroyed, ownership flips, and the attacker advances onto the tile.
+func _resolve_army_attack(army: Dictionary, tid: String) -> bool:
+	if _army_attack_value(army, tid) > _defense_value(tid):
+		for d in armies_at(tid):
+			_destroy_army(String(d.get("id", "")))
+		conquest_owner[tid] = String(army.get("owner", ""))
+		army["location"] = tid   # advance into the captured tile
+		return true
+	return false   # repulsed — attacker holds its ground and survives
+
+# --- Army movement (into an adjacent OWN, empty territory; once per round) ---
+func can_move_army(army_id: String, tid: String) -> bool:
+	var a := army_by_id(army_id)
+	if a.is_empty() or bool(a.get("moved", false)):
+		return false
+	if not (tid in _conquest_neighbors(String(a.get("location", "")))):
+		return false
+	if String(conquest_owner.get(tid, "")) != String(a.get("owner", "")):
+		return false
+	return armies_at(tid).is_empty()   # no stacking
+
+func move_army(army_id: String, tid: String) -> bool:
+	if not can_move_army(army_id, tid):
+		return false
+	var a := army_by_id(army_id)
+	a["location"] = tid
+	a["moved"] = true
+	save_conquest()
+	return true
+
 func conquest_supply_sources_for(pid: String) -> Array:
 	var out: Array = []
 	for t in conquest_territories():
