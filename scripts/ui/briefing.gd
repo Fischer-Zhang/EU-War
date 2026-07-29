@@ -78,10 +78,11 @@ func _conquest_header(scenario: Dictionary) -> String:
 		head = "[b][color=#e0993f]敵軍反攻——你指揮「%s」據守此地(攻守鏡像)。[/color][/b]\n" % you_name
 	else:
 		head = "[b][color=#7fd08f]進攻——你指揮「%s」奪取此地。[/color][/b]\n" % you_name
-	# Multi-front fatigue warning: this army has already fought this round.
-	var fatigue: int = GameState.conquest_battles_this_round
-	if fatigue > 0:
-		head += "[color=#e07070]⚠ 部隊疲憊:本回合第 %d 戰,開局壓制、士氣下滑(回合間才休整)。[/color]\n" % (fatigue + 1)
+	# The fielding army's strength — the real edge a strong, positioned army brings.
+	var army := GameState._battle_fielding_army()
+	if not army.is_empty():
+		head += "[color=#9fd0e0]我軍兵力 %d/%d——投入此戰。[/color]\n" % [
+			int(army.get("strength", 1)), GameState.CONQ_ARMY_STR_MAX]
 	return head + "\n"
 
 func _compose(scenario: Dictionary) -> String:

@@ -429,11 +429,11 @@ const CONQ_REINFORCE_COST := 4             # +1 strength (and a roster unit) to 
 # Auto-resolve is LOCAL, not empire-wide: a power's strength at a front comes from
 # its army level and its territories massed AROUND that front, not its total size.
 # This stops the biggest empire steamrolling every border at once (anti-snowball).
-const AR_W_ARMY := 2                        # weight of army level
-const AR_W_ADJ := 2                         # weight of own supplied territories adjacent to the front
-const AR_W_SIZE := 0                        # weight of total empire size (0 = size does not project)
+const AR_W_ARMY := 2                        # weight of army strength
+const AR_W_ADJ := 1                         # weight of own supplied territories adjacent to the front
 const AR_W_FORT := 2                        # weight of fortify (defender)
-const AR_W_DEFENDER := 1                    # home-defence edge / tie-breaker
+const AR_W_DEFENDER := 2                    # home-defence edge / tie-breaker
+const CONQ_ADJ_CAP := 2                     # cap on local adjacency mass (anti-snowball)
 var conquest_strength: int = 0
 var conquest_fortify: Dictionary = {}     # territory_id -> fortify level
 var conquest_industry: int = 0
@@ -644,16 +644,17 @@ func _synthesize_armies() -> void:
 			placed = true
 	if placed:
 		return
+	# Garrison every starting city: a power that opens with N cities but only one
+	# army would lose its other cities (garrison-only) on turn one — an instant
+	# collapse. One defending army per city makes the opening board stable, so
+	# conquest has to be earned rather than handed over undefended.
 	for pid in _all_powers():
 		if _is_eliminated(pid):
 			continue
-		var best := ""
 		for t in conquest_territories():
 			var tid := String(t.get("id", ""))
-			if String(conquest_owner.get(tid, "")) == pid and _is_city(t) and (best == "" or tid < best):
-				best = tid
-		if best != "":
-			_create_army(pid, best, CONQ_ARMY_START_STR)
+			if String(conquest_owner.get(tid, "")) == pid and _is_city(t):
+				_create_army(pid, tid, CONQ_ARMY_START_STR)
 
 # --- Army combat + movement (integer, deterministic, ties favour defender) ---
 # The successor of _est_strength/_auto_resolve, keyed to a positioned army. Local
@@ -751,14 +752,17 @@ func territory_attackable(tid: String) -> bool:
 		return false
 	return not _player_army_that_can_attack(tid).is_empty()
 
-# Count of pid's supplied territories adjacent to a front tile (local mass).
+# Count of pid's supplied territories adjacent to a front tile (local mass),
+# CAPPED so a sprawling empire can't turn every border into an overwhelming
+# multiplier — the cap is the key anti-snowball lever (a supported front is a
+# bonus, not an ever-growing one).
 func _adjacent_owned_supplied(pid: String, tid: String) -> int:
 	var sup := conquest_supplied_for(pid)
 	var n := 0
 	for nb in _conquest_neighbors(tid):
 		if String(conquest_owner.get(nb, "")) == pid and sup.has(nb):
 			n += 1
-	return n
+	return mini(n, CONQ_ADJ_CAP)
 
 # --- AI army turn ---
 
