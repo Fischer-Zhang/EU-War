@@ -13,6 +13,7 @@ extends Node2D
 @onready var hud: CanvasLayer = $HUD
 
 var selected_id: String = ""
+var selected_army_id: String = ""   # the player army whose orders are being staged
 
 func _ready() -> void:
 	if not GameState.in_conquest():
@@ -32,14 +33,42 @@ func _ready() -> void:
 		var t := GameState.conquest_territory(GameState.conquest_last_fought)
 		if not t.is_empty():
 			selected_id = GameState.conquest_last_fought
+			selected_army_id = _player_army_at(selected_id)
 			camera.focus_on(map_layer.world_pos(t))
 			camera.clamp_to_content()
 		GameState.conquest_last_fought = ""
 	_refresh()
 
 func _on_territory_clicked(tid: String) -> void:
+	# Second click of a two-stage order: if an army is picked and the clicked tile
+	# is one of its legal targets, issue the order there.
+	if selected_army_id != "":
+		if GameState.can_move_army(selected_army_id, tid):
+			GameState.move_army(selected_army_id, tid)
+			selected_id = tid
+			selected_army_id = _player_army_at(tid)
+			_refresh()
+			return
+		if GameState.can_army_attack(selected_army_id, tid):
+			_attack_with(selected_army_id, tid)
+			return
+	# Otherwise (re)select the tile and pick a player army standing on it, if any.
 	selected_id = tid
+	selected_army_id = _player_army_at(tid)
 	_refresh()
+
+# The id of a not-yet-acted player army on tid (preferred), else any player army
+# there, else "" — the army whose orders this tile's selection stages.
+func _player_army_at(tid: String) -> String:
+	var fallback := ""
+	for a in GameState.armies_at(tid):
+		if String(a.get("owner", "")) != GameState.player_power_id:
+			continue
+		if fallback == "":
+			fallback = String(a.get("id", ""))
+		if not bool(a.get("moved", false)):
+			return String(a.get("id", ""))
+	return fallback
 
 func _refresh() -> void:
 	for c in hud.get_children():
@@ -47,6 +76,7 @@ func _refresh() -> void:
 		c.queue_free()
 	_build_hud()
 	map_layer.selected_id = selected_id
+	map_layer.selected_army_id = selected_army_id
 	map_layer.queue_redraw()
 
 # ------------------------------------------------------------------- HUD build
@@ -223,7 +253,24 @@ func _build_dock(busy: bool, over: bool) -> void:
 		var fort := GameState.conquest_fortify_level(selected_id)
 		var supplied := GameState.territory_supplied(selected_id)
 		_label("工事 %d · %s" % [fort, ("有補給" if supplied else "斷補")], Vector2(x, y), 13,
-			Color(0.75, 0.8, 0.7) if supplied else Color(0.85, 0.6, 0.45)); y += 30
+			Color(0.75, 0.8, 0.7) if supplied else Color(0.85, 0.6, 0.45)); y += 26
+
+		# Picked-army panel: strength, veterans, and what it can do this round.
+		if selected_army_id != "":
+			var army := GameState.army_by_id(selected_army_id)
+			if not army.is_empty():
+				var acted: bool = bool(army.get("moved", false))
+				var vets: int = (army.get("roster", []) as Array).size()
+				_label("我軍 · 兵力 %d/%d%s" % [int(army.get("strength", 1)),
+					GameState.CONQ_ARMY_STR_MAX, ("  ·  老兵 %d" % vets) if vets > 0 else ""],
+					Vector2(x, y), 14, Color(0.85, 0.9, 0.7)); y += 22
+				if acted:
+					_label("本回合已行動", Vector2(x, y), 13, Color(0.7, 0.72, 0.75)); y += 22
+				elif _army_has_orders(selected_army_id):
+					_label("點高亮鄰格:藍=移動 橙=進攻", Vector2(x, y), 13, Color(0.7, 0.8, 0.9)); y += 22
+				else:
+					_label("無相鄰目標(可原地駐守)", Vector2(x, y), 13, Color(0.72, 0.74, 0.78)); y += 22
+		y += 4
 
 		# Context actions for the selected territory.
 		if not over:
@@ -294,8 +341,21 @@ func _build_result_overlay() -> void:
 
 # ------------------------------------------------------------------- actions
 
+func _army_has_orders(army_id: String) -> bool:
+	var a := GameState.army_by_id(army_id)
+	if a.is_empty() or bool(a.get("moved", false)):
+		return false
+	for nb in GameState._conquest_neighbors(String(a.get("location", ""))):
+		if GameState.can_move_army(army_id, nb) or GameState.can_army_attack(army_id, nb):
+			return true
+	return false
+
 func _attack(tid: String) -> void:
 	if GameState.begin_conquest_attack(tid):
+		get_tree().change_scene_to_file("res://scenes/briefing.tscn")
+
+func _attack_with(army_id: String, tid: String) -> void:
+	if GameState.begin_conquest_attack(tid, army_id):
 		get_tree().change_scene_to_file("res://scenes/briefing.tscn")
 
 func _defend() -> void:
@@ -329,4 +389,5 @@ func _prepare(kind: String) -> void:
 func _end_turn() -> void:
 	GameState.advance_conquest_round()
 	selected_id = ""
+	selected_army_id = ""
 	_refresh()

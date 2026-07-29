@@ -231,6 +231,18 @@ func _run() -> void:
 	gs.capture_roster([FakeUnit.new("musketeers", 6, 2), FakeUnit.new("pikemen", 3, 1)])
 	ok(gs.army_by_id("blue#0").get("roster", []).size() == 2, "survivors banked into the fielding army")
 
+	# --- Two-stage order via the map UI: click own army, then click a move target ---
+	gs.start_conquest(qid)
+	var amap = load("res://scenes/conquest_map.tscn").instantiate()
+	root.add_child(amap)
+	await process_frame
+	amap._on_territory_clicked("b_cap")
+	ok(amap.selected_army_id == "blue#0", "clicking an army-tile picks that army")
+	amap._on_territory_clicked("b_mine")   # adjacent own empty tile -> move order
+	ok(gs.army_by_id("blue#0").get("location", "") == "b_mine", "clicking a move target relocates the picked army")
+	amap.queue_free()
+	await process_frame
+
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()

@@ -19,11 +19,18 @@ const COLOR_LINK := Color(0.5, 0.5, 0.55, 0.55)
 const COLOR_SELECT := Color(1, 1, 1, 1)
 const COLOR_ATTACK := Color(0.9, 0.7, 0.2, 1)
 const COLOR_DANGER := Color(0.95, 0.45, 0.15, 1)
+const COLOR_MOVE := Color(0.4, 0.75, 0.95, 1)   # legal move target for the picked army
+const TOKEN_R := 30.0
 
 var selected_id: String = ""
+var selected_army_id: String = ""   # the player army whose orders are being staged
 
 func world_pos(t: Dictionary) -> Vector2:
 	return WORLD.position + Vector2(float(t.get("x", 0.5)), float(t.get("y", 0.5))) * WORLD.size
+
+func _marker_rect(t: Dictionary) -> Rect2:
+	var msize: Vector2 = CITY_SIZE if String(t.get("type", "city")) == "city" else RES_SIZE
+	return Rect2(world_pos(t) - msize * 0.5, msize)
 
 func content_rect() -> Rect2:
 	var r := Rect2()
@@ -103,14 +110,20 @@ func _draw() -> void:
 		else:
 			_draw_diamond(p, msize * 0.5, col)
 
-		# State ring (selected > under-attack > attackable).
+		# State ring. When an army is picked, its own legal orders take priority:
+		# cyan = move-here, orange = attack-here. Otherwise selected > under-attack
+		# > (any army) attackable.
 		var ring_col := Color(0, 0, 0, 0)
 		var ring_w := 0.0
-		if tid == selected_id:
+		if selected_army_id != "" and GameState.can_move_army(selected_army_id, tid):
+			ring_col = COLOR_MOVE; ring_w = 7.0
+		elif selected_army_id != "" and GameState.can_army_attack(selected_army_id, tid):
+			ring_col = COLOR_ATTACK; ring_w = 7.0
+		elif tid == selected_id:
 			ring_col = COLOR_SELECT; ring_w = 7.0
 		elif _pending_has(tid):
 			ring_col = COLOR_DANGER; ring_w = 7.0
-		elif GameState.territory_attackable(tid):
+		elif selected_army_id == "" and GameState.territory_attackable(tid):
 			ring_col = COLOR_ATTACK; ring_w = 7.0
 		if ring_w > 0.0:
 			draw_rect(rect.grow(10.0), ring_col, false, ring_w)
@@ -125,6 +138,32 @@ func _draw() -> void:
 		var ts := font.get_string_size(tname, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_SIZE)
 		draw_string(font, p + Vector2(-ts.x * 0.5, msize.y * 0.5 + LABEL_SIZE + 6),
 			tname, HORIZONTAL_ALIGNMENT_LEFT, -1, LABEL_SIZE, Color(0.95, 0.96, 0.98))
+
+	# Army tokens (drawn on top of markers): a power-coloured disc on the tile's
+	# upper-right corner with the army strength. The player's armies read brighter;
+	# an army that has already acted this round is dimmed; the picked one is ringed.
+	_draw_army_tokens(font, by_id)
+
+func _draw_army_tokens(font: Font, by_id: Dictionary) -> void:
+	for a in GameState.conquest_armies:
+		var tid := String(a.get("location", ""))
+		if not by_id.has(tid):
+			continue
+		var owner := String(a.get("owner", ""))
+		var mine := owner == GameState.player_power_id
+		var c := _marker_rect(by_id[tid]).position + Vector2(RES_SIZE.x * 0.5 + 6, -6)
+		var col := _power_color(owner)
+		if bool(a.get("moved", false)):
+			col = col.darkened(0.4)
+		draw_circle(c, TOKEN_R, col)
+		draw_arc(c, TOKEN_R, 0, TAU, 24,
+			COLOR_SELECT if mine else Color(0, 0, 0, 0.75), 4.0 if mine else 3.0)
+		if String(a.get("id", "")) == selected_army_id:
+			draw_arc(c, TOKEN_R + 7.0, 0, TAU, 28, COLOR_SELECT, 4.0)
+		var s := str(int(a.get("strength", 1)))
+		var ss := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 34)
+		draw_string(font, c + Vector2(-ss.x * 0.5, 12), s,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color(0.98, 0.98, 1.0))
 
 func _draw_diamond(c: Vector2, half: Vector2, col: Color) -> void:
 	var pts := PackedVector2Array([
