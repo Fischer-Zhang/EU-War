@@ -302,39 +302,55 @@ func promote_roster_unit(i: int) -> bool:
 	_save_progress()
 	return true
 
+# The tech context in play: a conquest game keeps its OWN unlocked set + research
+# pool (seeded by the chosen era), so its research doesn't touch the global/campaign
+# progress. Outside conquest these fall through to the global tech state.
+func active_techs() -> Array:
+	return conquest_techs if in_conquest() else unlocked_techs
+
+func research_pool() -> int:
+	return conquest_research if in_conquest() else research_points
+
 func tech_unlocked(tech_id: String) -> bool:
-	return tech_id in unlocked_techs
+	return tech_id in active_techs()
 
 func tech_prereqs_met(tech_id: String) -> bool:
 	var t: Dictionary = DataLoader.techs.get(tech_id, {})
+	var techs := active_techs()
 	for req in t.get("requires", []):
-		if not (req in unlocked_techs):
+		if not (req in techs):
 			return false
 	return true
 
 func tech_can_unlock(tech_id: String) -> bool:
-	if tech_id in unlocked_techs:
+	if tech_id in active_techs():
 		return false
 	var t: Dictionary = DataLoader.techs.get(tech_id, {})
 	if t.is_empty():
 		return false
-	if int(t.get("cost", 0)) > research_points:
+	if int(t.get("cost", 0)) > research_pool():
 		return false
 	return tech_prereqs_met(tech_id)
 
 func unlock_tech(tech_id: String) -> bool:
 	if not tech_can_unlock(tech_id):
 		return false
-	research_points -= int(DataLoader.techs[tech_id].get("cost", 0))
-	unlocked_techs.append(tech_id)
-	_save_progress()
+	var cost := int(DataLoader.techs[tech_id].get("cost", 0))
+	if in_conquest():
+		conquest_research -= cost
+		conquest_techs.append(tech_id)
+		save_conquest()
+	else:
+		research_points -= cost
+		unlocked_techs.append(tech_id)
+		_save_progress()
 	return true
 
-# Aggregate additive stat modifiers from all unlocked techs that apply to a unit
+# Aggregate additive stat modifiers from all active techs that apply to a unit
 # type. Shape matches CombatModifiers: { attack, defense, vs_armor, move, vision }.
 func tech_mods_for(type_id: String) -> Dictionary:
 	var out := {"attack": 0, "defense": 0, "vs_armor": 0, "move": 0, "vision": 0}
-	for tid in unlocked_techs:
+	for tid in active_techs():
 		var t: Dictionary = DataLoader.techs.get(tid, {})
 		var applies = t.get("applies_to", "all")
 		var matches: bool = (applies is Array and type_id in applies) or (not (applies is Array) and String(applies) == "all")
@@ -434,13 +450,21 @@ const AR_W_ADJ := 1                         # weight of own supplied territories
 const AR_W_FORT := 2                        # weight of fortify (defender)
 const AR_W_DEFENDER := 2                    # home-defence edge / tie-breaker
 const CONQ_ADJ_CAP := 2                     # cap on local adjacency mass (anti-snowball)
+# The chosen era seeds the player's tech; research earned per round advances it.
+const CONQ_START_YEAR_DEFAULT := 1631       # Thirty Years' War (fallback era)
+const CONQ_RESEARCH_PER_ROUND := 2          # base research the player earns each round
 var conquest_strength: int = 0
 var conquest_fortify: Dictionary = {}     # territory_id -> fortify level
 var conquest_industry: int = 0
 var conquest_training: int = 0
 var conquest_prep: Dictionary = {}        # prep kind -> true, for the pending battle
+var conquest_start_year: int = CONQ_START_YEAR_DEFAULT  # the era the game opened in
+var conquest_techs: Array = []            # tech ids unlocked in THIS conquest (player-only)
+var conquest_research: int = 0            # research points to spend on the tech tree
 
-func start_conquest(id: String) -> void:
+# Start a conquest on map `id`. `start_year` picks the era (seeds the player's
+# starting tech); `diff` optionally overrides the difficulty (else inherit global).
+func start_conquest(id: String, start_year: int = CONQ_START_YEAR_DEFAULT, diff: String = "") -> void:
 	conquest_id = id
 	conquest_powers = _load_powers()
 	player_power_id = _find_player_power()
@@ -454,7 +478,7 @@ func start_conquest(id: String) -> void:
 	conquest_treasury = {}
 	conquest_last_round_log = []
 	conquest_last_fought = ""
-	conquest_difficulty = difficulty   # inherit the globally-selected difficulty
+	conquest_difficulty = diff if diff != "" else difficulty   # explicit, else global
 	conquest_truce = {}
 	conquest_last_event = {}
 	conquest_strength = _power_start_treasury(player_power_id)
@@ -462,6 +486,9 @@ func start_conquest(id: String) -> void:
 	conquest_industry = 0
 	conquest_training = 0
 	conquest_prep = {}
+	conquest_start_year = start_year
+	conquest_techs = _techs_up_to_year(start_year)   # era-appropriate starting tech
+	conquest_research = 0
 	player_faction_override = ""   # conquest uses each territory's default sides
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", NEUTRAL))
@@ -469,6 +496,25 @@ func start_conquest(id: String) -> void:
 		conquest_treasury[pid] = _power_start_treasury(pid)
 	_synthesize_armies()   # place each power's starting armies on the map
 	save_conquest()   # a fresh conquest is immediately resumable
+
+# All tech ids available at or before `year` — the free starting set for an era.
+func _techs_up_to_year(year: int) -> Array:
+	var out: Array = []
+	for tid in DataLoader.techs.keys():
+		if int(DataLoader.techs[tid].get("year", 0)) <= year:
+			out.append(String(tid))
+	return out
+
+# Research the player earns per round: a base plus a bonus scaling with supplied
+# cities (a bigger, connected realm advances its tech faster).
+func _conquest_research_income() -> int:
+	var cities := 0
+	for tid in conquest_supplied_for(player_power_id):
+		if _is_city(conquest_territory(tid)):
+			cities += 1
+	@warning_ignore("integer_division")
+	var bonus := cities / 3
+	return CONQ_RESEARCH_PER_ROUND + bonus
 
 func clear_conquest() -> void:
 	conquest_id = ""
@@ -493,6 +539,9 @@ func clear_conquest() -> void:
 	conquest_prep = {}
 	conquest_armies = []
 	conquest_army_seq = {}
+	conquest_start_year = CONQ_START_YEAR_DEFAULT
+	conquest_techs = []
+	conquest_research = 0
 
 func in_conquest() -> bool:
 	return conquest_id != ""
@@ -945,6 +994,9 @@ func advance_conquest_round() -> bool:
 	for pid in _all_powers():
 		if not _is_eliminated(pid):
 			_grant_income(pid)
+	# The player earns research each round to advance up the tech tree.
+	if not _is_eliminated(player_power_id):
+		conquest_research += _conquest_research_income()
 	conquest_secured = {}          # repel immunity lasts only the round it was earned
 	# Truces count down and lapse.
 	var truces := {}
@@ -1435,6 +1487,9 @@ func save_conquest() -> void:
 		"industry": conquest_industry,
 		"training": conquest_training,
 		"prep": conquest_prep,
+		"start_year": conquest_start_year,
+		"techs": conquest_techs,
+		"research": conquest_research,
 	}
 	var f := FileAccess.open(CONQUEST_SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -1480,6 +1535,9 @@ func load_conquest() -> bool:
 	conquest_army_seq = parsed.get("army_seq", {})
 	if conquest_armies.is_empty():
 		_synthesize_armies()   # migrate a pre-armies save
+	conquest_start_year = int(parsed.get("start_year", CONQ_START_YEAR_DEFAULT))
+	conquest_research = int(parsed.get("research", 0))
+	conquest_techs = parsed.get("techs", _techs_up_to_year(conquest_start_year))  # pre-tech save -> era baseline
 	conquest_battle = {}
 	player_faction_override = ""
 	return true

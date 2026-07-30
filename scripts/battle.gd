@@ -951,8 +951,9 @@ func _close_tutorial() -> void:
 # units as a persistent self-effect, which CombatModifiers.for_unit already folds
 # into attack/defense/vs_armor/move/vision. No-op outside a campaign.
 func _apply_tech_bonuses() -> void:
-	# Global tech: unlocked upgrades apply to player units in every mode.
-	if GameState.unlocked_techs.is_empty():
+	# Tech upgrades apply to player units in every mode. In conquest the ACTIVE
+	# set is the conquest's own era-seeded techs; elsewhere it's the global set.
+	if GameState.active_techs().is_empty():
 		return
 	for u in units:
 		if u.faction_id != player_faction:

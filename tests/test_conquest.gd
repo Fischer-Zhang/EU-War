@@ -251,6 +251,33 @@ func _run() -> void:
 	ok(gs.conquest_income_for("ottoman") > gs.conquest_income_for("russia"),
 		"a richer economy out-earns a poorer one each round")
 
+	# --- Era-seeded tech tree (player-only, conquest-scoped) ---
+	var global_before: int = gs.unlocked_techs.size()
+	gs.start_conquest("grand_europe", 1631)   # Thirty Years' War era
+	ok(gs.conquest_start_year == 1631, "conquest records its start era")
+	ok(gs.tech_unlocked("corned_powder") and gs.tech_unlocked("field_gunnery"),
+		"era seeds all tech at/before the start year for free")
+	ok(not gs.tech_unlocked("flintlock_musket") and not gs.tech_unlocked("combined_arms"),
+		"later-era tech is NOT pre-unlocked")
+	ok(gs.tech_mods_for("musketeers")["attack"] >= 2,
+		"seeded conquest tech buffs the player's units (corned_powder + volley_fire)")
+	var res0: int = gs.conquest_research
+	gs.advance_conquest_round()
+	ok(gs.conquest_research > res0, "the player earns research each round")
+	# Research forward: combined_arms needs field_gunnery + cavalry_doctrine (both seeded).
+	gs.conquest_research = 99
+	ok(gs.tech_can_unlock("combined_arms"), "a prereq-met later tech becomes researchable")
+	ok(gs.unlock_tech("combined_arms"), "unlock spends conquest research")
+	ok(gs.conquest_research == 94, "conquest research pool paid the cost (5)")
+	ok("combined_arms" in gs.conquest_techs, "the tech joins the conquest set")
+	ok(gs.unlocked_techs.size() == global_before, "conquest research never touches the global tech set")
+	# Tech state survives a save/load round-trip.
+	gs.save_conquest()
+	gs.clear_conquest()
+	ok(gs.load_conquest(), "conquest with tech state reloads")
+	ok(gs.conquest_start_year == 1631 and "combined_arms" in gs.conquest_techs,
+		"era + researched tech restored from save")
+
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()
