@@ -2,65 +2,288 @@
   "longbow_mastery": {
     "name": "長弓精練",
     "desc": "長弓兵與弩兵 +1 攻擊",
+    "era": "中世紀",
+    "year": 1340,
     "cost": 2,
     "requires": [],
-    "applies_to": ["longbowmen", "crossbowmen"],
-    "mods": { "attack": 1 }
-  },
-  "corned_powder": {
-    "name": "顆粒火藥",
-    "desc": "火繩槍兵與火槍兵 +1 攻擊",
-    "cost": 2,
-    "requires": [],
-    "applies_to": ["arquebusiers", "musketeers"],
-    "mods": { "attack": 1 }
-  },
-  "tempered_plate": {
-    "name": "精煉板甲",
-    "desc": "下馬騎士與重騎兵 +1 防禦",
-    "cost": 2,
-    "requires": [],
-    "applies_to": ["men_at_arms", "heavy_cavalry"],
-    "mods": { "defense": 1 }
-  },
-  "pike_drill": {
-    "name": "長矛操典",
-    "desc": "長矛兵 +1 防禦、+1 破甲",
-    "cost": 3,
-    "requires": [],
-    "applies_to": ["pikemen"],
-    "mods": { "defense": 1, "vs_armor": 1 }
+    "applies_to": [
+      "longbowmen",
+      "crossbowmen"
+    ],
+    "mods": {
+      "attack": 1
+    }
   },
   "scouting": {
     "name": "偵察體系",
     "desc": "全軍 +1 視野",
+    "era": "中世紀",
+    "year": 1350,
     "cost": 2,
     "requires": [],
     "applies_to": "all",
-    "mods": { "vision": 1 }
+    "mods": {
+      "vision": 1
+    }
+  },
+  "tempered_plate": {
+    "name": "精煉板甲",
+    "desc": "下馬騎士與重騎兵 +1 防禦",
+    "era": "中世紀",
+    "year": 1400,
+    "cost": 2,
+    "requires": [],
+    "applies_to": [
+      "men_at_arms",
+      "heavy_cavalry"
+    ],
+    "mods": {
+      "defense": 1
+    }
+  },
+  "siege_bombards": {
+    "name": "攻城臼砲",
+    "desc": "野砲與臼砲 +1 攻擊",
+    "era": "文藝復興",
+    "year": 1490,
+    "cost": 3,
+    "requires": [],
+    "applies_to": [
+      "field_cannon",
+      "mortar"
+    ],
+    "mods": {
+      "attack": 1
+    }
+  },
+  "pike_drill": {
+    "name": "長矛操典",
+    "desc": "長矛兵 +1 防禦、+1 破甲",
+    "era": "文藝復興",
+    "year": 1500,
+    "cost": 3,
+    "requires": [],
+    "applies_to": [
+      "pikemen"
+    ],
+    "mods": {
+      "defense": 1,
+      "vs_armor": 1
+    }
+  },
+  "corned_powder": {
+    "name": "顆粒火藥",
+    "desc": "火繩槍兵與火槍兵 +1 攻擊",
+    "era": "文藝復興",
+    "year": 1500,
+    "cost": 2,
+    "requires": [],
+    "applies_to": [
+      "arquebusiers",
+      "musketeers"
+    ],
+    "mods": {
+      "attack": 1
+    }
+  },
+  "tercio_formation": {
+    "name": "方陣戰術",
+    "desc": "長矛兵與火繩槍兵 +1 防禦",
+    "era": "文藝復興",
+    "year": 1540,
+    "cost": 3,
+    "requires": [
+      "pike_drill"
+    ],
+    "applies_to": [
+      "pikemen",
+      "arquebusiers"
+    ],
+    "mods": {
+      "defense": 1
+    }
+  },
+  "volley_fire": {
+    "name": "齊射操典",
+    "desc": "火繩槍兵與火槍兵 +1 攻擊",
+    "era": "火藥革命",
+    "year": 1600,
+    "cost": 3,
+    "requires": [
+      "corned_powder"
+    ],
+    "applies_to": [
+      "arquebusiers",
+      "musketeers"
+    ],
+    "mods": {
+      "attack": 1
+    }
   },
   "field_gunnery": {
     "name": "野戰砲術",
     "desc": "野砲與臼砲 +1 攻擊",
+    "era": "火藥革命",
+    "year": 1620,
     "cost": 3,
-    "requires": ["corned_powder"],
-    "applies_to": ["field_cannon", "mortar"],
-    "mods": { "attack": 1 }
+    "requires": [
+      "corned_powder"
+    ],
+    "applies_to": [
+      "field_cannon",
+      "mortar"
+    ],
+    "mods": {
+      "attack": 1
+    }
   },
   "cavalry_doctrine": {
     "name": "騎兵教範",
     "desc": "所有騎兵 +1 移動",
+    "era": "火藥革命",
+    "year": 1630,
     "cost": 3,
-    "requires": ["tempered_plate"],
-    "applies_to": ["light_cavalry", "heavy_cavalry", "dragoons"],
-    "mods": { "move": 1 }
+    "requires": [
+      "tempered_plate"
+    ],
+    "applies_to": [
+      "light_cavalry",
+      "heavy_cavalry",
+      "dragoons"
+    ],
+    "mods": {
+      "move": 1
+    }
+  },
+  "mobile_artillery": {
+    "name": "機動砲隊",
+    "desc": "野砲 +1 移動",
+    "era": "火藥革命",
+    "year": 1630,
+    "cost": 3,
+    "requires": [
+      "field_gunnery"
+    ],
+    "applies_to": [
+      "field_cannon"
+    ],
+    "mods": {
+      "move": 1
+    }
   },
   "combined_arms": {
     "name": "諸兵種協同",
     "desc": "全軍 +1 攻擊",
+    "era": "火藥革命",
+    "year": 1640,
     "cost": 5,
-    "requires": ["field_gunnery", "cavalry_doctrine"],
+    "requires": [
+      "field_gunnery",
+      "cavalry_doctrine"
+    ],
     "applies_to": "all",
-    "mods": { "attack": 1 }
+    "mods": {
+      "attack": 1
+    }
+  },
+  "flintlock_musket": {
+    "name": "燧發槍",
+    "desc": "火槍兵 +1 攻擊",
+    "era": "理性時代",
+    "year": 1690,
+    "cost": 4,
+    "requires": [
+      "volley_fire"
+    ],
+    "applies_to": [
+      "musketeers"
+    ],
+    "mods": {
+      "attack": 1
+    }
+  },
+  "socket_bayonet": {
+    "name": "套筒刺刀",
+    "desc": "火槍兵 +1 防禦、+1 破甲(兼備近戰)",
+    "era": "理性時代",
+    "year": 1700,
+    "cost": 4,
+    "requires": [
+      "flintlock_musket",
+      "pike_drill"
+    ],
+    "applies_to": [
+      "musketeers"
+    ],
+    "mods": {
+      "defense": 1,
+      "vs_armor": 1
+    }
+  },
+  "linear_tactics": {
+    "name": "線列戰術",
+    "desc": "火槍兵與長矛兵 +1 攻擊(排放齊射)",
+    "era": "理性時代",
+    "year": 1710,
+    "cost": 5,
+    "requires": [
+      "socket_bayonet"
+    ],
+    "applies_to": [
+      "musketeers",
+      "pikemen"
+    ],
+    "mods": {
+      "attack": 1
+    }
+  },
+  "dragoon_doctrine": {
+    "name": "龍騎兵教範",
+    "desc": "龍騎兵 +1 移動、+1 攻擊",
+    "era": "理性時代",
+    "year": 1720,
+    "cost": 4,
+    "requires": [
+      "cavalry_doctrine"
+    ],
+    "applies_to": [
+      "dragoons"
+    ],
+    "mods": {
+      "move": 1,
+      "attack": 1
+    }
+  },
+  "horse_artillery": {
+    "name": "騎砲兵",
+    "desc": "野砲 +1 移動、+1 攻擊",
+    "era": "理性時代",
+    "year": 1740,
+    "cost": 4,
+    "requires": [
+      "mobile_artillery"
+    ],
+    "applies_to": [
+      "field_cannon"
+    ],
+    "mods": {
+      "move": 1,
+      "attack": 1
+    }
+  },
+  "grand_battery": {
+    "name": "大砲兵陣",
+    "desc": "全軍 +1 攻擊(火力頂點)",
+    "era": "理性時代",
+    "year": 1750,
+    "cost": 6,
+    "requires": [
+      "horse_artillery",
+      "linear_tactics"
+    ],
+    "applies_to": "all",
+    "mods": {
+      "attack": 1
+    }
   }
 }
