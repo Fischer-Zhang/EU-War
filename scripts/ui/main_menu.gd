@@ -102,10 +102,8 @@ func _on_campaign_pressed() -> void:
 
 func _on_conquest_pressed() -> void:
 	GameState.clear_campaign()
-	# The grand multi-power Europe map is the default conquest.
-	var qid := "grand_europe" if DataLoader.conquests.has("grand_europe") else String(DataLoader.conquests.keys()[0])
-	GameState.start_conquest(qid)
-	get_tree().change_scene_to_file("res://scenes/conquest_map.tscn")
+	# Choose map / era / difficulty on the setup screen before launching.
+	get_tree().change_scene_to_file("res://scenes/conquest_setup.tscn")
 
 func _on_quit_pressed() -> void:
 	get_tree().quit()

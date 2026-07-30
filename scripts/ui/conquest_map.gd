@@ -142,14 +142,19 @@ func _build_hud() -> void:
 			_total_cities(), int(counts.get("powers_alive", 0))]
 
 	# Economy readout.
-	_label("資源 %d  ·  每回合 +%d  ·  軍隊 %d  ·  工業 Lv%d  ·  訓練 Lv%d" % [
+	_label("資源 %d  ·  每回合 +%d  ·  軍隊 %d  ·  工業 Lv%d  ·  訓練 Lv%d  ·  %d年 · 研究 %d" % [
 		GameState.conquest_strength, GameState.conquest_income(),
 		GameState.armies_of(GameState.player_power_id).size(),
-		GameState.conquest_industry, GameState.conquest_training],
+		GameState.conquest_industry, GameState.conquest_training,
+		GameState.conquest_start_year, GameState.conquest_research],
 		Vector2(28, 80), 15, Color(0.82, 0.86, 0.9))
 
 	_build_standings(Vector2(28, 106))
 	_build_difficulty(Vector2(984, 20))
+	# Tech tree entry (opens in conquest context; returns to this map).
+	_button("科技樹 ▸", Vector2(984, 46), Vector2(140, 28), over, func():
+		GameState.save_conquest()
+		get_tree().change_scene_to_file("res://scenes/tech_screen.tscn"))
 	_build_round_log(Vector2(28, 470))
 	_build_dock(busy, over)
 
@@ -184,21 +189,10 @@ func _build_standings(pos: Vector2) -> void:
 		x += 128.0
 
 func _build_difficulty(pos: Vector2) -> void:
-	# The rival powers' AI difficulty — set at the game's start, then locked in.
-	var editable: bool = GameState.conquest_round == 0 \
-		and GameState.conquest_pending_defenses().is_empty() and not GameState.conquest_over()
-	_label("難度", pos, 14, Color(0.8, 0.83, 0.88))
-	var x := pos.x + 48
-	for o in [["easy", "簡單"], ["normal", "普通"], ["hard", "困難"]]:
-		var key: String = o[0]
-		var cur: bool = GameState.conquest_difficulty == key
-		_button(("● " if cur else "") + String(o[1]), Vector2(x, pos.y - 4), Vector2(66, 26),
-			not editable, _set_difficulty.bind(key))
-		x += 72
-
-func _set_difficulty(d: String) -> void:
-	GameState.set_conquest_difficulty(d)
-	_refresh()
+	# The rival powers' AI difficulty is chosen on the setup screen, then locked in.
+	var names := {"easy": "簡單", "normal": "普通", "hard": "困難"}
+	_label("難度:%s" % String(names.get(GameState.conquest_difficulty, GameState.conquest_difficulty)),
+		pos, 14, Color(0.8, 0.83, 0.88))
 
 func _offer_truce(pid: String) -> void:
 	GameState.offer_truce(pid)

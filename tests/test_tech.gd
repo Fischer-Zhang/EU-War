@@ -94,10 +94,14 @@ func _run() -> void:
 	root.add_child(ts)
 	await process_frame
 	await process_frame
-	ok(ts._list != null and ts._list.get_child_count() == dl.techs.size(),
+	var tech_btns := []
+	for c in ts._list.get_children():
+		if c is Button:   # skip the per-era header labels
+			tech_btns.append(c)
+	ok(ts._list != null and tech_btns.size() == dl.techs.size(),
 		"tech screen lists all %d techs" % dl.techs.size())
 	var pre = gs.unlocked_techs.size()
-	for tbtn in ts._list.get_children():
+	for tbtn in tech_btns:
 		if not tbtn.disabled:
 			tbtn.emit_signal("pressed")
 			break
