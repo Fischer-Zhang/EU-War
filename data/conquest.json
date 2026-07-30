@@ -8,43 +8,50 @@
         "id": "france",
         "name": "法蘭西",
         "color": "#2f6fb0",
-        "controller": "player"
+        "controller": "player",
+        "start_treasury": 4
       },
       {
         "id": "england",
         "name": "英格蘭",
         "color": "#c0392b",
-        "controller": "ai"
+        "controller": "ai",
+        "start_treasury": 3
       },
       {
         "id": "spain",
         "name": "西班牙",
         "color": "#d4a017",
-        "controller": "ai"
+        "controller": "ai",
+        "start_treasury": 4
       },
       {
         "id": "habsburg",
         "name": "哈布斯堡",
         "color": "#c9c9d0",
-        "controller": "ai"
+        "controller": "ai",
+        "start_treasury": 3
       },
       {
         "id": "sweden",
         "name": "瑞典",
         "color": "#4aa3df",
-        "controller": "ai"
+        "controller": "ai",
+        "start_treasury": 2
       },
       {
         "id": "russia",
         "name": "俄羅斯",
         "color": "#3f8f4f",
-        "controller": "ai"
+        "controller": "ai",
+        "start_treasury": 2
       },
       {
         "id": "ottoman",
         "name": "鄂圖曼",
         "color": "#1f9e8f",
-        "controller": "ai"
+        "controller": "ai",
+        "start_treasury": 4
       }
     ],
     "territories": [
@@ -66,6 +73,7 @@
         "name": "倫敦",
         "owner": "england",
         "type": "city",
+        "yield": 1,
         "x": 0.13,
         "y": 0.28,
         "scenario": "03_agincourt_1415",
@@ -109,6 +117,7 @@
         "name": "諾曼第",
         "owner": "france",
         "type": "city",
+        "yield": 1,
         "x": 0.21,
         "y": 0.3,
         "scenario": "06_breitenfeld_1631",
@@ -125,6 +134,7 @@
         "name": "巴黎",
         "owner": "france",
         "type": "city",
+        "yield": 1,
         "x": 0.26,
         "y": 0.34,
         "scenario": "07_rocroi_1643",
@@ -189,6 +199,7 @@
         "name": "卡斯提爾",
         "owner": "spain",
         "type": "city",
+        "yield": 1,
         "x": 0.13,
         "y": 0.54,
         "scenario": "11_narva_1700",
@@ -458,6 +469,7 @@
         "name": "斯德哥爾摩",
         "owner": "sweden",
         "type": "city",
+        "yield": 1,
         "x": 0.49,
         "y": 0.1,
         "scenario": "28_marston_moor_1644",
@@ -480,7 +492,7 @@
           "livonia",
           "novgorod"
         ],
-        "yield": 2
+        "yield": 1
       },
       {
         "id": "livonia",
@@ -589,7 +601,7 @@
           "anatolia",
           "serbia"
         ],
-        "yield": 2
+        "yield": 1
       },
       {
         "id": "serbia",
@@ -605,7 +617,7 @@
           "constantinople",
           "crimea"
         ],
-        "yield": 2
+        "yield": 1
       },
       {
         "id": "greece",
@@ -620,13 +632,14 @@
           "constantinople",
           "anatolia"
         ],
-        "yield": 2
+        "yield": 1
       },
       {
         "id": "constantinople",
         "name": "君士坦丁堡",
         "owner": "ottoman",
         "type": "city",
+        "yield": 1,
         "x": 0.61,
         "y": 0.53,
         "scenario": "11_narva_1700",
@@ -671,6 +684,7 @@
         "name": "埃及",
         "owner": "ottoman",
         "type": "city",
+        "yield": 1,
         "x": 0.64,
         "y": 0.8,
         "scenario": "14_ravenna_1512",

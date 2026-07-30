@@ -243,6 +243,14 @@ func _run() -> void:
 	amap.queue_free()
 	await process_frame
 
+	# --- Historical per-power starting resources (grand_europe) ---
+	gs.start_conquest("grand_europe")
+	ok(gs.conquest_strength == 4, "France opens with its historical war-chest")
+	ok(int(gs.conquest_treasury.get("ottoman", 0)) == 4, "the Ottoman AI opens with its war-chest")
+	ok(int(gs.conquest_treasury.get("russia", 0)) == 2, "poorer Russia opens with a smaller war-chest")
+	ok(gs.conquest_income_for("ottoman") > gs.conquest_income_for("russia"),
+		"a richer economy out-earns a poorer one each round")
+
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()

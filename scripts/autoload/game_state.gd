@@ -457,7 +457,7 @@ func start_conquest(id: String) -> void:
 	conquest_difficulty = difficulty   # inherit the globally-selected difficulty
 	conquest_truce = {}
 	conquest_last_event = {}
-	conquest_strength = CONQ_START_STRENGTH
+	conquest_strength = _power_start_treasury(player_power_id)
 	conquest_fortify = {}
 	conquest_industry = 0
 	conquest_training = 0
@@ -466,7 +466,7 @@ func start_conquest(id: String) -> void:
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", NEUTRAL))
 	for pid in _ai_powers_in_order():
-		conquest_treasury[pid] = CONQ_START_STRENGTH
+		conquest_treasury[pid] = _power_start_treasury(pid)
 	_synthesize_armies()   # place each power's starting armies on the map
 	save_conquest()   # a fresh conquest is immediately resumable
 
@@ -530,6 +530,11 @@ func conquest_power(pid: String) -> Dictionary:
 
 func power_controller(pid: String) -> String:
 	return String(conquest_power(pid).get("controller", ""))
+
+# A power's historical starting war-chest (data-driven; defaults to the flat
+# start). Lets each power open with resources scaled to its real fiscal strength.
+func _power_start_treasury(pid: String) -> int:
+	return int(conquest_power(pid).get("start_treasury", CONQ_START_STRENGTH))
 
 func _all_powers() -> Array:
 	var out: Array = []
