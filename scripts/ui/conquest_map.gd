@@ -142,11 +142,13 @@ func _build_hud() -> void:
 			_total_cities(), int(counts.get("powers_alive", 0))]
 
 	# Economy readout.
-	_label("資源 %d  ·  每回合 +%d  ·  軍隊 %d  ·  工業 Lv%d  ·  訓練 Lv%d  ·  %d年 · 研究 %d" % [
+	var focus_names := {"infantry": "步兵", "cavalry": "騎兵", "artillery": "砲兵", "support": "支援"}
+	var focus_txt: String = String(focus_names.get(GameState.conquest_focus, "無"))
+	_label("資源 %d  ·  每回合 +%d  ·  軍隊 %d  ·  工業 Lv%d  ·  研究院 Lv%d  ·  %d年 · 研究 %d(專精:%s)" % [
 		GameState.conquest_strength, GameState.conquest_income(),
 		GameState.armies_of(GameState.player_power_id).size(),
-		GameState.conquest_industry, GameState.conquest_training,
-		GameState.conquest_start_year, GameState.conquest_research],
+		GameState.conquest_industry, GameState.conquest_academy,
+		GameState.conquest_start_year, GameState.conquest_research, focus_txt],
 		Vector2(28, 80), 15, Color(0.82, 0.86, 0.9))
 
 	_build_standings(Vector2(28, 106))
@@ -296,6 +298,8 @@ func _build_dock(busy: bool, over: bool) -> void:
 		busy or not GameState.can_recruit(), _recruit); y += 34
 	_button("整補 老兵+1階 (費%d)" % GameState.CONQ_HEAL_COST, Vector2(x, y), bw,
 		busy or not GameState.can_heal(), _heal); y += 34
+	_button("研究院 研究+1 (費%d)" % GameState.CONQ_ACADEMY_COST, Vector2(x, y), bw,
+		busy or not GameState.can_develop("academy"), _develop.bind("academy")); y += 34
 
 	# Pre-battle preparations for the next fight.
 	y = dock.position.y + 396

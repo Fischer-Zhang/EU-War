@@ -328,14 +328,14 @@ func tech_can_unlock(tech_id: String) -> bool:
 	var t: Dictionary = DataLoader.techs.get(tech_id, {})
 	if t.is_empty():
 		return false
-	if int(t.get("cost", 0)) > research_pool():
+	if tech_cost(tech_id) > research_pool():
 		return false
 	return tech_prereqs_met(tech_id)
 
 func unlock_tech(tech_id: String) -> bool:
 	if not tech_can_unlock(tech_id):
 		return false
-	var cost := int(DataLoader.techs[tech_id].get("cost", 0))
+	var cost := tech_cost(tech_id)
 	if in_conquest():
 		conquest_research -= cost
 		conquest_techs.append(tech_id)
@@ -424,6 +424,8 @@ const CONQ_INDUSTRY_MAX := 3
 const CONQ_TRAINING_COST := 4
 const CONQ_TRAINING_MAX := 2
 const CONQ_TRAIN_XP := 3                   # start XP granted per training level
+const CONQ_ACADEMY_COST := 4               # research building: +1 research/round per level
+const CONQ_ACADEMY_MAX := 3
 # Pre-battle preparations (one-shot, consumed by the next battle): recon grants
 # army-wide vision, barrage softens the enemy, supply digs your troops in.
 const CONQ_PREP_COST := {"recon": 2, "barrage": 3, "supply": 2}
@@ -461,6 +463,9 @@ var conquest_prep: Dictionary = {}        # prep kind -> true, for the pending b
 var conquest_start_year: int = CONQ_START_YEAR_DEFAULT  # the era the game opened in
 var conquest_techs: Array = []            # tech ids unlocked in THIS conquest (player-only)
 var conquest_research: int = 0            # research points to spend on the tech tree
+var conquest_academy: int = 0             # research building level (+1 research/round each)
+var conquest_focus: String = ""           # active research specialization (a branch), one at a time
+const CONQ_FOCUS_BRANCHES := ["infantry", "cavalry", "artillery", "support"]
 
 # Start a conquest on map `id`. `start_year` picks the era (seeds the player's
 # starting tech); `diff` optionally overrides the difficulty (else inherit global).
@@ -489,6 +494,8 @@ func start_conquest(id: String, start_year: int = CONQ_START_YEAR_DEFAULT, diff:
 	conquest_start_year = start_year
 	conquest_techs = _techs_up_to_year(start_year)   # era-appropriate starting tech
 	conquest_research = 0
+	conquest_academy = 0
+	conquest_focus = ""
 	player_faction_override = ""   # conquest uses each territory's default sides
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", NEUTRAL))
@@ -505,9 +512,12 @@ func _techs_up_to_year(year: int) -> Array:
 			out.append(String(tid))
 	return out
 
-# Research the player earns per round: a base plus a bonus scaling with supplied
-# cities (a bigger, connected realm advances its tech faster).
-func _conquest_research_income() -> int:
+# Research the player earns per round, from three sources (per design):
+#   natural  (main)  = base + supplied-cities scaling — a bigger realm advances faster
+#   building (small) = the research academy level
+#   focus    (big)   = an active specialization roughly DOUBLES the natural rate
+# Only one focus can be active at a time (conquest_focus).
+func _conquest_natural_research() -> int:
 	var cities := 0
 	for tid in conquest_supplied_for(player_power_id):
 		if _is_city(conquest_territory(tid)):
@@ -515,6 +525,29 @@ func _conquest_research_income() -> int:
 	@warning_ignore("integer_division")
 	var bonus := cities / 3
 	return CONQ_RESEARCH_PER_ROUND + bonus
+
+func _conquest_research_income() -> int:
+	var natural := _conquest_natural_research()
+	var total := natural + conquest_academy          # + building (small)
+	if conquest_focus != "":
+		total += natural                             # + focus (greatly speeds progress)
+	return total
+
+# The cost to unlock a tech, with the active focus discounting its own branch
+# (a specialization researches its line faster). Never below 1.
+func tech_cost(tech_id: String) -> int:
+	var c := int(DataLoader.techs.get(tech_id, {}).get("cost", 0))
+	if in_conquest() and conquest_focus != "" \
+		and String(DataLoader.techs.get(tech_id, {}).get("branch", "")) == conquest_focus:
+		c = maxi(1, c - 1)
+	return c
+
+# Set the active research specialization (a branch, or "" for none). One at a time.
+func set_conquest_focus(branch: String) -> void:
+	if not in_conquest():
+		return
+	conquest_focus = branch if branch in CONQ_FOCUS_BRANCHES else ""
+	save_conquest()
 
 func clear_conquest() -> void:
 	conquest_id = ""
@@ -542,6 +575,8 @@ func clear_conquest() -> void:
 	conquest_start_year = CONQ_START_YEAR_DEFAULT
 	conquest_techs = []
 	conquest_research = 0
+	conquest_academy = 0
+	conquest_focus = ""
 
 func in_conquest() -> bool:
 	return conquest_id != ""
@@ -1349,6 +1384,7 @@ func _develop_state(track: String) -> Array:
 	match track:
 		"industry": return [conquest_industry, CONQ_INDUSTRY_COST, CONQ_INDUSTRY_MAX]
 		"training": return [conquest_training, CONQ_TRAINING_COST, CONQ_TRAINING_MAX]
+		"academy": return [conquest_academy, CONQ_ACADEMY_COST, CONQ_ACADEMY_MAX]
 	return []
 
 func can_develop(track: String) -> bool:
@@ -1365,6 +1401,7 @@ func develop(track: String) -> bool:
 	match track:
 		"industry": conquest_industry += 1
 		"training": conquest_training += 1
+		"academy": conquest_academy += 1
 	save_conquest()
 	return true
 
@@ -1490,6 +1527,8 @@ func save_conquest() -> void:
 		"start_year": conquest_start_year,
 		"techs": conquest_techs,
 		"research": conquest_research,
+		"academy": conquest_academy,
+		"focus": conquest_focus,
 	}
 	var f := FileAccess.open(CONQUEST_SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -1538,6 +1577,8 @@ func load_conquest() -> bool:
 	conquest_start_year = int(parsed.get("start_year", CONQ_START_YEAR_DEFAULT))
 	conquest_research = int(parsed.get("research", 0))
 	conquest_techs = parsed.get("techs", _techs_up_to_year(conquest_start_year))  # pre-tech save -> era baseline
+	conquest_academy = int(parsed.get("academy", 0))
+	conquest_focus = String(parsed.get("focus", ""))
 	conquest_battle = {}
 	player_faction_override = ""
 	return true

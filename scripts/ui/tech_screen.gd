@@ -76,11 +76,41 @@ func _ready() -> void:
 
 	_rebuild()
 
+const FOCUS_NAMES := {"infantry": "步兵", "cavalry": "騎兵", "artillery": "砲兵", "support": "支援"}
+
 func _rebuild() -> void:
 	var pool := GameState.research_pool()
-	_points_label.text = "研究點數:%d" % pool if _conquest else "研發點數:%d" % pool
+	if _conquest:
+		_points_label.text = "研究點數:%d(每回合 +%d)" % [pool, GameState._conquest_research_income()]
+	else:
+		_points_label.text = "研發點數:%d" % pool
 	for c in _list.get_children():
 		c.queue_free()
+	# Research focus (conquest only): one at a time; greatly speeds research and
+	# discounts its own branch's techs.
+	if _conquest:
+		var fl := Label.new()
+		fl.text = "研究專精(擇一,大幅加速研究、該兵種科技減價):"
+		fl.add_theme_font_size_override("font_size", 15)
+		fl.modulate = Color(0.8, 0.85, 0.95)
+		_list.add_child(fl)
+		var frow := HBoxContainer.new()
+		frow.add_theme_constant_override("separation", 6)
+		var opts := [["", "無"]]
+		for b in GameState.CONQ_FOCUS_BRANCHES:
+			opts.append([b, String(FOCUS_NAMES.get(b, b))])
+		for o in opts:
+			var fb := Button.new()
+			fb.text = ("● " if GameState.conquest_focus == o[0] else "") + String(o[1])
+			fb.custom_minimum_size = Vector2(0, 34)
+			fb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			fb.add_theme_font_size_override("font_size", 14)
+			var branch: String = o[0]
+			fb.pressed.connect(func():
+				GameState.set_conquest_focus(branch)
+				_rebuild())
+			frow.add_child(fb)
+		_list.add_child(frow)
 	# Techs sorted by year, with an era header inserted whenever the era changes.
 	var ids := DataLoader.techs.keys()
 	ids.sort_custom(func(a, b):
@@ -114,8 +144,11 @@ func _rebuild() -> void:
 func _tech_line(tech_id: String, t: Dictionary, pool: int) -> String:
 	var nm := String(t.get("name", tech_id))
 	var desc := String(t.get("desc", ""))
-	var cost := int(t.get("cost", 0))
+	var cost := GameState.tech_cost(tech_id)   # reflects the active focus discount
 	var year := int(t.get("year", 0))
+	var focused: bool = _conquest and GameState.conquest_focus != "" \
+		and String(t.get("branch", "")) == GameState.conquest_focus
+	var star := " ★" if focused else ""
 	var status := ""
 	if GameState.tech_unlocked(tech_id):
 		status = "✓ 已解鎖"
@@ -125,7 +158,7 @@ func _tech_line(tech_id: String, t: Dictionary, pool: int) -> String:
 		status = "點數不足(需 %d)" % cost
 	else:
 		status = "解鎖(%d 點)" % cost
-	return "%d  %s  —  %s\n%s" % [year, nm, desc, status]
+	return "%d  %s%s  —  %s\n%s" % [year, nm, star, desc, status]
 
 func _prereq_names(t: Dictionary) -> String:
 	var names := []

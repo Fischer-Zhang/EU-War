@@ -278,6 +278,30 @@ func _run() -> void:
 	ok(gs.conquest_start_year == 1631 and "combined_arms" in gs.conquest_techs,
 		"era + researched tech restored from save")
 
+	# --- Research model: natural (main) + building (academy) + focus ---
+	gs.start_conquest("grand_europe", 1631)
+	var nat: int = gs._conquest_natural_research()
+	ok(gs._conquest_research_income() == nat, "no-focus income = natural + academy(0)")
+	gs.conquest_strength = 30
+	ok(gs.develop("academy") and gs.conquest_academy == 1, "academy building levels up")
+	ok(gs._conquest_research_income() == nat + 1, "the academy adds a small research bonus")
+	# Focus: one at a time, greatly boosts the rate, discounts its own branch.
+	ok(gs.conquest_focus == "", "no focus at start")
+	gs.set_conquest_focus("artillery")
+	ok(gs.conquest_focus == "artillery", "a focus can be set")
+	ok(gs._conquest_research_income() == nat + 1 + nat, "an active focus roughly doubles the natural rate")
+	ok(gs.tech_cost("regimental_guns") == 3 and gs.tech_cost("flintlock_musket") == 4,
+		"focus discounts its own branch (artillery -1), not others")
+	gs.set_conquest_focus("cavalry")
+	ok(gs.conquest_focus == "cavalry" and gs.tech_cost("regimental_guns") == 4,
+		"switching focus is exclusive (artillery discount gone)")
+	gs.set_conquest_focus("bogus")
+	ok(gs.conquest_focus == "", "an invalid focus clears it")
+	gs.set_conquest_focus("artillery")
+	gs.save_conquest(); gs.clear_conquest(); gs.load_conquest()
+	ok(gs.conquest_academy == 1 and gs.conquest_focus == "artillery",
+		"academy + focus restored from save")
+
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()
