@@ -302,6 +302,34 @@ func _run() -> void:
 	ok(gs.conquest_academy == 1 and gs.conquest_focus == "artillery",
 		"academy + focus restored from save")
 
+	# --- AI powers research their own tech (per-power, economy-driven) ---
+	gs.start_conquest("grand_europe", 1631)
+	ok("corned_powder" in gs.techs_of_power("ottoman") and not ("flintlock_musket" in gs.techs_of_power("ottoman")),
+		"each AI power is seeded at the era baseline")
+	ok(gs.tech_mods_for_power("ottoman", "musketeers")["attack"] >= 2,
+		"an AI power's tech buffs its own units")
+	var ott0: int = gs.techs_of_power("ottoman").size()
+	for _i in range(8):
+		gs.advance_conquest_round()
+	var ott1: int = gs.techs_of_power("ottoman").size()
+	ok(ott1 > ott0, "AI powers unlock further tech over the rounds")
+	# Determinism: a second identical run reaches the same AI tech set.
+	var snap: Array = gs.techs_of_power("ottoman").duplicate()
+	snap.sort()
+	gs.start_conquest("grand_europe", 1631)
+	for _j in range(8):
+		gs.advance_conquest_round()
+	var snap2: Array = gs.techs_of_power("ottoman").duplicate()
+	snap2.sort()
+	ok(snap == snap2, "AI research is deterministic across runs")
+	# The rival the player fights is reported for enemy buffing; state saves.
+	gs.save_conquest(); gs.clear_conquest(); gs.load_conquest()
+	ok(not gs.techs_of_power("ottoman").is_empty(), "AI tech restored from save")
+	gs.start_conquest(qid)   # test_arena: blue player, red/green AI
+	gs.begin_conquest_attack("r_cap")
+	ok(gs.conquest_enemy_pid() == "red", "the battle's enemy power is identified for tech buffing")
+	gs.cancel_conquest_battle()
+
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()

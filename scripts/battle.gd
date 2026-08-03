@@ -951,14 +951,19 @@ func _close_tutorial() -> void:
 # units as a persistent self-effect, which CombatModifiers.for_unit already folds
 # into attack/defense/vs_armor/move/vision. No-op outside a campaign.
 func _apply_tech_bonuses() -> void:
-	# Tech upgrades apply to player units in every mode. In conquest the ACTIVE
-	# set is the conquest's own era-seeded techs; elsewhere it's the global set.
-	if GameState.active_techs().is_empty():
-		return
+	# Tech upgrades apply to player units in every mode (conquest uses the active
+	# era-seeded set, elsewhere the global set). In conquest the ENEMY faction is
+	# also buffed by the rival POWER's own researched tech — so a late-era foe is
+	# not a sitting duck against a teched-up player.
+	var enemy_pid := GameState.conquest_enemy_pid()
 	for u in units:
-		if u.faction_id != player_faction:
+		var mods: Dictionary
+		if u.faction_id == player_faction:
+			mods = GameState.tech_mods_for(u.type_id)
+		elif enemy_pid != "":
+			mods = GameState.tech_mods_for_power(enemy_pid, u.type_id)
+		else:
 			continue
-		var mods: Dictionary = GameState.tech_mods_for(u.type_id)
 		var any := false
 		for k in mods.keys():
 			if int(mods[k]) != 0:

@@ -346,11 +346,11 @@ func unlock_tech(tech_id: String) -> bool:
 		_save_progress()
 	return true
 
-# Aggregate additive stat modifiers from all active techs that apply to a unit
-# type. Shape matches CombatModifiers: { attack, defense, vs_armor, move, vision }.
-func tech_mods_for(type_id: String) -> Dictionary:
+# Aggregate additive stat modifiers from a set of techs that apply to a unit type.
+# Shape matches CombatModifiers: { attack, defense, vs_armor, move, vision }.
+func _tech_mods_over(techs: Array, type_id: String) -> Dictionary:
 	var out := {"attack": 0, "defense": 0, "vs_armor": 0, "move": 0, "vision": 0}
-	for tid in active_techs():
+	for tid in techs:
 		var t: Dictionary = DataLoader.techs.get(tid, {})
 		var applies = t.get("applies_to", "all")
 		var matches: bool = (applies is Array and type_id in applies) or (not (applies is Array) and String(applies) == "all")
@@ -360,6 +360,28 @@ func tech_mods_for(type_id: String) -> Dictionary:
 		for k in out.keys():
 			out[k] += int(m.get(k, 0))
 	return out
+
+# The player's (active-context) tech mods for a unit type.
+func tech_mods_for(type_id: String) -> Dictionary:
+	return _tech_mods_over(active_techs(), type_id)
+
+# A specific power's conquest tech set (the player's is the interactive one;
+# each AI power researches its own, seeded by the era). Empty outside conquest.
+func techs_of_power(pid: String) -> Array:
+	if pid == player_power_id:
+		return conquest_techs
+	return conquest_power_techs.get(pid, [])
+
+func tech_mods_for_power(pid: String, type_id: String) -> Dictionary:
+	return _tech_mods_over(techs_of_power(pid), type_id)
+
+# The rival power the player is fighting in the current conquest battle ("" if none).
+func conquest_enemy_pid() -> String:
+	if not in_conquest() or conquest_battle.is_empty():
+		return ""
+	var atk := String(conquest_battle.get("attacker", ""))
+	var dfd := String(conquest_battle.get("defender", ""))
+	return dfd if atk == player_power_id else atk
 
 # ------------------------------------------------------------------ conquest
 
@@ -466,6 +488,10 @@ var conquest_research: int = 0            # research points to spend on the tech
 var conquest_academy: int = 0             # research building level (+1 research/round each)
 var conquest_focus: String = ""           # active research specialization (a branch), one at a time
 const CONQ_FOCUS_BRANCHES := ["infantry", "cavalry", "artillery", "support"]
+# Each AI power researches its own tech (seeded by the era, advanced by economy);
+# it buffs that power's units in the player's battles and its auto-resolve strength.
+var conquest_power_techs: Dictionary = {}    # pid -> Array of tech ids (AI powers)
+var conquest_power_research: Dictionary = {} # pid -> int research pool (AI powers)
 
 # Start a conquest on map `id`. `start_year` picks the era (seeds the player's
 # starting tech); `diff` optionally overrides the difficulty (else inherit global).
@@ -496,6 +522,11 @@ func start_conquest(id: String, start_year: int = CONQ_START_YEAR_DEFAULT, diff:
 	conquest_research = 0
 	conquest_academy = 0
 	conquest_focus = ""
+	conquest_power_techs = {}
+	conquest_power_research = {}
+	for pid in _ai_powers_in_order():
+		conquest_power_techs[pid] = _techs_up_to_year(start_year)   # same era baseline
+		conquest_power_research[pid] = 0
 	player_faction_override = ""   # conquest uses each territory's default sides
 	for t in conquest_territories():
 		conquest_owner[String(t.get("id", ""))] = String(t.get("owner", NEUTRAL))
@@ -517,14 +548,54 @@ func _techs_up_to_year(year: int) -> Array:
 #   building (small) = the research academy level
 #   focus    (big)   = an active specialization roughly DOUBLES the natural rate
 # Only one focus can be active at a time (conquest_focus).
-func _conquest_natural_research() -> int:
-	var cities := 0
-	for tid in conquest_supplied_for(player_power_id):
+func _supplied_city_count(pid: String) -> int:
+	var n := 0
+	for tid in conquest_supplied_for(pid):
 		if _is_city(conquest_territory(tid)):
-			cities += 1
+			n += 1
+	return n
+
+func _conquest_natural_research() -> int:
 	@warning_ignore("integer_division")
-	var bonus := cities / 3
+	var bonus := _supplied_city_count(player_power_id) / 3
 	return CONQ_RESEARCH_PER_ROUND + bonus
+
+# One AI power's research for the round: accrue on its own economy, then greedily
+# unlock the cheapest prereq-met tech it can afford (deterministic; id tie-break).
+func _ai_research_step(pid: String) -> void:
+	if _is_eliminated(pid):
+		return
+	@warning_ignore("integer_division")
+	var gained := CONQ_RESEARCH_PER_ROUND + _supplied_city_count(pid) / 3
+	var pool := int(conquest_power_research.get(pid, 0)) + gained
+	var techs: Array = conquest_power_techs.get(pid, [])
+	while true:
+		var best := ""
+		var best_cost := 1 << 30
+		for tid in DataLoader.techs.keys():
+			var s := String(tid)
+			if s in techs:
+				continue
+			var t: Dictionary = DataLoader.techs[s]
+			var c := int(t.get("cost", 0))
+			if c > pool:
+				continue
+			var met := true
+			for req in t.get("requires", []):
+				if not (req in techs):
+					met = false
+					break
+			if not met:
+				continue
+			if best == "" or c < best_cost or (c == best_cost and s < best):
+				best = s
+				best_cost = c
+		if best == "":
+			break
+		pool -= best_cost
+		techs.append(best)
+	conquest_power_research[pid] = pool
+	conquest_power_techs[pid] = techs
 
 func _conquest_research_income() -> int:
 	var natural := _conquest_natural_research()
@@ -577,6 +648,8 @@ func clear_conquest() -> void:
 	conquest_research = 0
 	conquest_academy = 0
 	conquest_focus = ""
+	conquest_power_techs = {}
+	conquest_power_research = {}
 
 func in_conquest() -> bool:
 	return conquest_id != ""
@@ -1032,6 +1105,9 @@ func advance_conquest_round() -> bool:
 	# The player earns research each round to advance up the tech tree.
 	if not _is_eliminated(player_power_id):
 		conquest_research += _conquest_research_income()
+	# Each AI power researches on its own economy (deterministic auto-unlock).
+	for pid in _ai_powers_in_order():
+		_ai_research_step(pid)
 	conquest_secured = {}          # repel immunity lasts only the round it was earned
 	# Truces count down and lapse.
 	var truces := {}
@@ -1529,6 +1605,8 @@ func save_conquest() -> void:
 		"research": conquest_research,
 		"academy": conquest_academy,
 		"focus": conquest_focus,
+		"power_techs": conquest_power_techs,
+		"power_research": conquest_power_research,
 	}
 	var f := FileAccess.open(CONQUEST_SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -1579,6 +1657,12 @@ func load_conquest() -> bool:
 	conquest_techs = parsed.get("techs", _techs_up_to_year(conquest_start_year))  # pre-tech save -> era baseline
 	conquest_academy = int(parsed.get("academy", 0))
 	conquest_focus = String(parsed.get("focus", ""))
+	conquest_power_techs = parsed.get("power_techs", {})
+	conquest_power_research = parsed.get("power_research", {})
+	if conquest_power_techs.is_empty():   # pre-AI-tech save: seed rivals at the era baseline
+		for pid in _ai_powers_in_order():
+			conquest_power_techs[pid] = _techs_up_to_year(conquest_start_year)
+			conquest_power_research[pid] = 0
 	conquest_battle = {}
 	player_faction_override = ""
 	return true
