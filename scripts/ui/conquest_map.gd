@@ -299,10 +299,9 @@ func _build_dock(busy: bool, over: bool) -> void:
 	_button("整補 老兵+1階 (費%d)" % GameState.CONQ_HEAL_COST, Vector2(x, y), bw,
 		busy or not GameState.can_heal(), _heal); y += 34
 	_button("研究院 研究+1 (費%d)" % GameState.CONQ_ACADEMY_COST, Vector2(x, y), bw,
-		busy or not GameState.can_develop("academy"), _develop.bind("academy")); y += 34
+		busy or not GameState.can_develop("academy"), _develop.bind("academy")); y += 42
 
-	# Pre-battle preparations for the next fight.
-	y = dock.position.y + 396
+	# Pre-battle preparations for the next fight (flows below 國政, no fixed offset).
 	_label("戰前準備(下場生效)", Vector2(x, y), 14, Color(0.8, 0.83, 0.88)); y += 26
 	for kind in ["recon", "barrage", "supply"]:
 		var names := {"recon": "偵察 視野+1", "barrage": "砲擊 削弱敵軍", "supply": "補給 工事/士氣"}

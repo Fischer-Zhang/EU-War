@@ -95,11 +95,11 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var tech_btns := []
-	for c in ts._list.get_children():
-		if c is Button:   # skip the per-era header labels
+	for c in ts._tree_host.get_children():
+		if c is Button:   # skip the column-header labels and the connector-line canvas
 			tech_btns.append(c)
-	ok(ts._list != null and tech_btns.size() == dl.techs.size(),
-		"tech screen lists all %d techs" % dl.techs.size())
+	ok(ts._tree_host != null and tech_btns.size() == dl.techs.size(),
+		"tech tree shows a node per tech (%d)" % dl.techs.size())
 	var pre = gs.unlocked_techs.size()
 	for tbtn in tech_btns:
 		if not tbtn.disabled:

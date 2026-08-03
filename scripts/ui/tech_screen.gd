@@ -1,14 +1,33 @@
 extends Control
 
-# Tech tree screen. Lists every technology grouped by era with its cost, effect
-# and prerequisites; unlocking spends research points. Context-aware: inside a
-# conquest it shows/spends that game's OWN era-seeded research (returning to the
-# map); otherwise it drives the global/campaign tech set. Built at runtime so the
-# scene file stays a bare Control.
+# Tech tree screen — a visual branching DAG: four branch columns (infantry /
+# cavalry / artillery / support) laid out by year, with connector lines drawn
+# from each tech to its prerequisites. Context-aware: inside a conquest it
+# shows/spends that game's OWN era-seeded research (and a research focus),
+# returning to the map; otherwise it drives the global/campaign tech set.
+# Built at runtime so the scene file stays a bare Control.
 
-var _points_label: Label
-var _list: VBoxContainer
+const COLS := ["infantry", "cavalry", "artillery", "support"]
+const COL_NAMES := {"infantry": "步兵", "cavalry": "騎兵", "artillery": "砲兵", "support": "支援"}
+const FOCUS_NAMES := {"infantry": "步兵", "cavalry": "騎兵", "artillery": "砲兵", "support": "支援"}
+const COL_W := 300
+const NODE_W := 264
+const NODE_H := 58
+const ROW_H := 82
+const HEADER_H := 30
+
 var _conquest: bool = false
+var _points_label: Label
+var _focus_row: HBoxContainer
+var _tree_host: Control
+
+# Inner canvas that draws the prerequisite connector lines behind the nodes.
+class TreeLines:
+	extends Control
+	var edges: Array = []   # each: [Vector2 from, Vector2 to, Color]
+	func _draw() -> void:
+		for e in edges:
+			draw_line(e[0], e[1], e[2], 3.0, true)
 
 func _ready() -> void:
 	_conquest = GameState.in_conquest()
@@ -23,44 +42,46 @@ func _ready() -> void:
 	margin.anchor_right = 1.0
 	margin.anchor_bottom = 1.0
 	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(side, 28)
+		margin.add_theme_constant_override(side, 24)
 	add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
+	vbox.add_theme_constant_override("separation", 10)
 	margin.add_child(vbox)
 
 	var title := Label.new()
-	title.text = "科技研發 · %d 年起" % GameState.conquest_start_year if _conquest else "科技研發"
-	title.add_theme_font_size_override("font_size", 30)
+	title.text = "科技樹 · %d 年起" % GameState.conquest_start_year if _conquest else "科技樹"
+	title.add_theme_font_size_override("font_size", 28)
 	vbox.add_child(title)
 
 	_points_label = Label.new()
-	_points_label.add_theme_font_size_override("font_size", 20)
+	_points_label.add_theme_font_size_override("font_size", 19)
 	vbox.add_child(_points_label)
 
 	var hint := Label.new()
 	if _conquest:
-		hint.text = "征服每回合累積研究點數(本局專屬)。你以所選年代之前的科技開局,沿科技樹往 18 世紀推進;解鎖為相應兵種提供永久加成,於你親臨的戰鬥生效。"
+		hint.text = "四大分支縱向依年代排列,連線為前置需求。以所選年代之前的科技開局,靠研究點沿樹往 18 世紀推進。"
 	else:
-		hint.text = "任何模式的每場勝利都獲得研發點數(全域共用、自動存檔)。解鎖科技為全軍相應兵種提供永久加成,於所有模式生效。"
-	hint.add_theme_font_size_override("font_size", 14)
+		hint.text = "四大分支縱向依年代排列,連線為前置需求。每場勝利獲得研發點數(全域共用),解鎖為相應兵種提供永久加成。"
+	hint.add_theme_font_size_override("font_size", 13)
 	hint.modulate = Color(0.75, 0.78, 0.82)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(hint)
 
+	# Research focus selector (conquest only) — one specialization at a time.
+	if _conquest:
+		_focus_row = HBoxContainer.new()
+		_focus_row.add_theme_constant_override("separation", 6)
+		vbox.add_child(_focus_row)
+
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	vbox.add_child(scroll)
 
-	_list = VBoxContainer.new()
-	_list.add_theme_constant_override("separation", 8)
-	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_list)
+	_tree_host = Control.new()
+	scroll.add_child(_tree_host)
 
 	var back := Button.new()
-	# Return to wherever we came from: conquest map, campaign lounge, or main menu.
 	var dest := "res://scenes/main_menu.tscn"
 	if _conquest:
 		back.text = "返回征服地圖"
@@ -70,99 +91,137 @@ func _ready() -> void:
 		dest = "res://scenes/lounge.tscn"
 	else:
 		back.text = "返回主選單"
-	back.custom_minimum_size = Vector2(0, 44)
+	back.custom_minimum_size = Vector2(0, 42)
 	back.pressed.connect(func(): get_tree().change_scene_to_file(dest))
 	vbox.add_child(back)
 
 	_rebuild()
 
-const FOCUS_NAMES := {"infantry": "步兵", "cavalry": "騎兵", "artillery": "砲兵", "support": "支援"}
-
 func _rebuild() -> void:
 	var pool := GameState.research_pool()
 	if _conquest:
 		_points_label.text = "研究點數:%d(每回合 +%d)" % [pool, GameState._conquest_research_income()]
+		_rebuild_focus_row()
 	else:
 		_points_label.text = "研發點數:%d" % pool
-	for c in _list.get_children():
-		c.queue_free()
-	# Research focus (conquest only): one at a time; greatly speeds research and
-	# discounts its own branch's techs.
-	if _conquest:
-		var fl := Label.new()
-		fl.text = "研究專精(擇一,大幅加速研究、該兵種科技減價):"
-		fl.add_theme_font_size_override("font_size", 15)
-		fl.modulate = Color(0.8, 0.85, 0.95)
-		_list.add_child(fl)
-		var frow := HBoxContainer.new()
-		frow.add_theme_constant_override("separation", 6)
-		var opts := [["", "無"]]
-		for b in GameState.CONQ_FOCUS_BRANCHES:
-			opts.append([b, String(FOCUS_NAMES.get(b, b))])
-		for o in opts:
-			var fb := Button.new()
-			fb.text = ("● " if GameState.conquest_focus == o[0] else "") + String(o[1])
-			fb.custom_minimum_size = Vector2(0, 34)
-			fb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			fb.add_theme_font_size_override("font_size", 14)
-			var branch: String = o[0]
-			fb.pressed.connect(func():
-				GameState.set_conquest_focus(branch)
-				_rebuild())
-			frow.add_child(fb)
-		_list.add_child(frow)
-	# Techs sorted by year, with an era header inserted whenever the era changes.
-	var ids := DataLoader.techs.keys()
-	ids.sort_custom(func(a, b):
-		var ya := int(DataLoader.techs[a].get("year", 0))
-		var yb := int(DataLoader.techs[b].get("year", 0))
-		return ya < yb if ya != yb else String(a) < String(b))
-	var cur_era := ""
-	for tid in ids:
-		var tech_id := String(tid)
-		var t: Dictionary = DataLoader.techs[tid]
-		var era := String(t.get("era", ""))
-		if era != cur_era:
-			cur_era = era
-			var hdr := Label.new()
-			hdr.text = "— %s —" % era
-			hdr.add_theme_font_size_override("font_size", 17)
-			hdr.modulate = Color(0.95, 0.85, 0.5)
-			_list.add_child(hdr)
-		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(0, 54)
-		btn.add_theme_font_size_override("font_size", 16)
-		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		btn.clip_text = true
-		btn.text = _tech_line(tech_id, t, pool)
-		btn.disabled = not GameState.tech_can_unlock(tech_id)
-		btn.pressed.connect(func():
-			if GameState.unlock_tech(tech_id):
-				_rebuild())
-		_list.add_child(btn)
 
-func _tech_line(tech_id: String, t: Dictionary, pool: int) -> String:
+	for c in _tree_host.get_children():
+		c.queue_free()
+
+	# Assign techs to branch columns, each sorted by year (top -> bottom).
+	var by_col := {}
+	for col in COLS:
+		by_col[col] = []
+	for tid in DataLoader.techs.keys():
+		var col := String(DataLoader.techs[tid].get("branch", "support"))
+		if not by_col.has(col):
+			col = "support"
+		by_col[col].append(String(tid))
+	for col in COLS:
+		by_col[col].sort_custom(func(a, b):
+			var ya := int(DataLoader.techs[a].get("year", 0))
+			var yb := int(DataLoader.techs[b].get("year", 0))
+			return ya < yb if ya != yb else String(a) < String(b))
+
+	# Node rectangles keyed by tech id.
+	var rect := {}
+	var max_rows := 1
+	for ci in range(COLS.size()):
+		var col: String = COLS[ci]
+		var x: float = ci * COL_W + (COL_W - NODE_W) * 0.5
+		for i in range((by_col[col] as Array).size()):
+			var tid: String = by_col[col][i]
+			rect[tid] = Rect2(x, HEADER_H + i * ROW_H, NODE_W, NODE_H)
+		max_rows = maxi(max_rows, (by_col[col] as Array).size())
+
+	var canvas_size := Vector2(COLS.size() * COL_W, HEADER_H + max_rows * ROW_H + 16)
+	_tree_host.custom_minimum_size = canvas_size
+
+	# Connector lines (drawn first, behind the nodes).
+	var lines := TreeLines.new()
+	lines.custom_minimum_size = canvas_size
+	lines.size = canvas_size
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var edges: Array = []
+	for tid in rect.keys():
+		for req in DataLoader.techs[tid].get("requires", []):
+			if not rect.has(req):
+				continue
+			var a: Rect2 = rect[req]
+			var b: Rect2 = rect[tid]
+			var col_line := Color(0.45, 0.75, 0.5, 0.9) if GameState.tech_unlocked(String(req)) else Color(0.5, 0.5, 0.55, 0.7)
+			edges.append([a.position + Vector2(a.size.x * 0.5, a.size.y), b.position + Vector2(b.size.x * 0.5, 0), col_line])
+	lines.edges = edges
+	_tree_host.add_child(lines)
+
+	# Column headers.
+	var font := ThemeDB.fallback_font
+	for ci in range(COLS.size()):
+		var hdr := Label.new()
+		hdr.text = String(COL_NAMES[COLS[ci]])
+		hdr.add_theme_font_size_override("font_size", 17)
+		hdr.modulate = Color(0.95, 0.85, 0.5)
+		hdr.position = Vector2(ci * COL_W + (COL_W - NODE_W) * 0.5, 0)
+		_tree_host.add_child(hdr)
+
+	# Nodes.
+	for tid in rect.keys():
+		var t: Dictionary = DataLoader.techs[tid]
+		var btn := Button.new()
+		btn.position = (rect[tid] as Rect2).position
+		btn.custom_minimum_size = Vector2(NODE_W, NODE_H)
+		btn.size = Vector2(NODE_W, NODE_H)
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.clip_text = true
+		btn.text = _node_text(String(tid), t)
+		btn.modulate = _node_color(String(tid), t, pool)
+		btn.disabled = not GameState.tech_can_unlock(String(tid))
+		var this_id := String(tid)
+		btn.pressed.connect(func():
+			if GameState.unlock_tech(this_id):
+				_rebuild())
+		_tree_host.add_child(btn)
+
+func _rebuild_focus_row() -> void:
+	for c in _focus_row.get_children():
+		c.queue_free()
+	var lbl := Label.new()
+	lbl.text = "專精:"
+	lbl.add_theme_font_size_override("font_size", 14)
+	_focus_row.add_child(lbl)
+	var opts := [["", "無"]]
+	for b in GameState.CONQ_FOCUS_BRANCHES:
+		opts.append([b, String(FOCUS_NAMES.get(b, b))])
+	for o in opts:
+		var fb := Button.new()
+		fb.text = ("● " if GameState.conquest_focus == o[0] else "") + String(o[1])
+		fb.custom_minimum_size = Vector2(96, 32)
+		fb.add_theme_font_size_override("font_size", 14)
+		var branch: String = o[0]
+		fb.pressed.connect(func():
+			GameState.set_conquest_focus(branch)
+			_rebuild())
+		_focus_row.add_child(fb)
+
+func _node_text(tech_id: String, t: Dictionary) -> String:
 	var nm := String(t.get("name", tech_id))
-	var desc := String(t.get("desc", ""))
-	var cost := GameState.tech_cost(tech_id)   # reflects the active focus discount
 	var year := int(t.get("year", 0))
 	var focused: bool = _conquest and GameState.conquest_focus != "" \
 		and String(t.get("branch", "")) == GameState.conquest_focus
-	var star := " ★" if focused else ""
-	var status := ""
+	var tail := ""
 	if GameState.tech_unlocked(tech_id):
-		status = "✓ 已解鎖"
+		tail = "✓"
 	elif not GameState.tech_prereqs_met(tech_id):
-		status = "🔒 需前置:%s" % _prereq_names(t)
-	elif cost > pool:
-		status = "點數不足(需 %d)" % cost
+		tail = "🔒"
 	else:
-		status = "解鎖(%d 點)" % cost
-	return "%d  %s%s  —  %s\n%s" % [year, nm, star, desc, status]
+		tail = "%d點%s" % [GameState.tech_cost(tech_id), ("★" if focused else "")]
+	return "%s\n%d · %s" % [nm, year, tail]
 
-func _prereq_names(t: Dictionary) -> String:
-	var names := []
-	for req in t.get("requires", []):
-		var rt: Dictionary = DataLoader.techs.get(req, {})
-		names.append(String(rt.get("name", req)))
-	return "、".join(names)
+func _node_color(tech_id: String, _t: Dictionary, pool: int) -> Color:
+	if GameState.tech_unlocked(tech_id):
+		return Color(0.6, 0.9, 0.6)          # unlocked
+	if not GameState.tech_prereqs_met(tech_id):
+		return Color(0.62, 0.62, 0.66)       # locked by prereq
+	if GameState.tech_cost(tech_id) > pool:
+		return Color(0.92, 0.78, 0.45)       # affordable prereqs, not enough points
+	return Color(1, 1, 1)                     # ready to unlock
