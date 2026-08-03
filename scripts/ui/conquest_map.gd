@@ -188,6 +188,11 @@ func _build_standings(pos: Vector2) -> void:
 			Vector2(x, pos.y), 14)
 		var col := Color(String(p.get("color", "#888888")))
 		chip.modulate = col.darkened(0.4) if elim else col
+		# Tech readout: how far up the tree this power has researched.
+		if not elim:
+			var n := GameState.techs_of_power(pid).size()
+			_label("⚙科技 %d/%d" % [n, DataLoader.techs.size()], Vector2(x, pos.y + 18), 12,
+				Color(0.7, 0.74, 0.8))
 		x += 128.0
 
 func _build_difficulty(pos: Vector2) -> void:

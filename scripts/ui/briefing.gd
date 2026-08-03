@@ -83,6 +83,15 @@ func _conquest_header(scenario: Dictionary) -> String:
 	if not army.is_empty():
 		head += "[color=#9fd0e0]我軍兵力 %d/%d——投入此戰。[/color]\n" % [
 			int(army.get("strength", 1)), GameState.CONQ_ARMY_STR_MAX]
+	# The enemy power's tech standing — their units carry these upgrades this battle.
+	var enemy := GameState.conquest_enemy_pid()
+	if enemy != "":
+		var ename := String(GameState.conquest_power(enemy).get("name", enemy))
+		var n := GameState.techs_of_power(enemy).size()
+		var top: Array = GameState.power_top_techs(enemy, 3)
+		var tail := ("最新:" + "、".join(top)) if not top.is_empty() else "尚無"
+		head += "[color=#e0a0a0]敵軍(%s)科技 %d/%d — %s。[/color]\n" % [
+			ename, n, DataLoader.techs.size(), tail]
 	return head + "\n"
 
 func _compose(scenario: Dictionary) -> String:

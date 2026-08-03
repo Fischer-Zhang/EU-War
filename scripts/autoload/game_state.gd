@@ -375,6 +375,17 @@ func techs_of_power(pid: String) -> Array:
 func tech_mods_for_power(pid: String, type_id: String) -> Dictionary:
 	return _tech_mods_over(techs_of_power(pid), type_id)
 
+# A power's most-advanced researched techs (names, latest year first) — for the
+# player-facing tech readouts (standings, briefing).
+func power_top_techs(pid: String, n: int = 3) -> Array:
+	var ids: Array = techs_of_power(pid).duplicate()
+	ids.sort_custom(func(a, b):
+		return int(DataLoader.techs.get(a, {}).get("year", 0)) > int(DataLoader.techs.get(b, {}).get("year", 0)))
+	var out: Array = []
+	for i in range(mini(n, ids.size())):
+		out.append(String(DataLoader.techs.get(ids[i], {}).get("name", ids[i])))
+	return out
+
 # The rival power the player is fighting in the current conquest battle ("" if none).
 func conquest_enemy_pid() -> String:
 	if not in_conquest() or conquest_battle.is_empty():
