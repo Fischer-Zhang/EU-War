@@ -110,6 +110,13 @@ func _run() -> void:
 	ts.queue_free()
 	await process_frame
 
+	# Per-stat cap: a deep tree can't stack a unit into a stomp (musketeers would
+	# be +7 attack uncapped; capped so tech is an edge, not a doubling).
+	gs.unlocked_techs = dl.techs.keys()
+	var mm = gs.tech_mods_for("musketeers")
+	ok(mm["attack"] == gs.TECH_MOD_CAP["attack"], "tech attack bonus is capped (musketeers +%d, not +7)" % int(mm["attack"]))
+	ok(mm["move"] <= gs.TECH_MOD_CAP["move"], "tech move bonus is capped")
+
 	if fails == 0:
 		print("test_tech: ok")
 		quit(0)

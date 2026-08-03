@@ -348,6 +348,11 @@ func unlock_tech(tech_id: String) -> bool:
 
 # Aggregate additive stat modifiers from a set of techs that apply to a unit type.
 # Shape matches CombatModifiers: { attack, defense, vs_armor, move, vision }.
+# Per-stat cap on a unit type's TOTAL tech bonus. A deep tree could otherwise
+# stack (e.g. musketeers +7 attack ≈ double base), letting tech overwhelm tactics
+# and flip battles to flawless stomps. Capped, tech is a real edge, not a rout.
+const TECH_MOD_CAP := {"attack": 3, "defense": 3, "vs_armor": 2, "move": 1, "vision": 2}
+
 func _tech_mods_over(techs: Array, type_id: String) -> Dictionary:
 	var out := {"attack": 0, "defense": 0, "vs_armor": 0, "move": 0, "vision": 0}
 	for tid in techs:
@@ -359,6 +364,8 @@ func _tech_mods_over(techs: Array, type_id: String) -> Dictionary:
 		var m: Dictionary = t.get("mods", {})
 		for k in out.keys():
 			out[k] += int(m.get(k, 0))
+	for k in out.keys():
+		out[k] = mini(int(out[k]), int(TECH_MOD_CAP.get(k, 99)))
 	return out
 
 # The player's (active-context) tech mods for a unit type.
