@@ -474,6 +474,8 @@ const AR_W_ADJ := 1                         # weight of own supplied territories
 const AR_W_FORT := 2                        # weight of fortify (defender)
 const AR_W_DEFENDER := 2                    # home-defence edge / tie-breaker
 const CONQ_ADJ_CAP := 2                     # cap on local adjacency mass (anti-snowball)
+const CONQ_TECH_AR_PER := 9                 # techs per +1 auto-resolve tech bonus
+const CONQ_TECH_AR_CAP := 2                 # cap on the auto-resolve tech bonus (anti-snowball)
 # The chosen era seeds the player's tech; research earned per round advances it.
 const CONQ_START_YEAR_DEFAULT := 1631       # Thirty Years' War (fallback era)
 const CONQ_RESEARCH_PER_ROUND := 2          # base research the player earns each round
@@ -822,9 +824,20 @@ func _synthesize_armies() -> void:
 # The successor of _est_strength/_auto_resolve, keyed to a positioned army. Local
 # strength philosophy unchanged: army strength + own supplied territories massed
 # around the front; the defender adds garrison/fortify/terrain + a home edge.
+# A power's small, capped auto-resolve edge from its researched tech. Kept modest
+# (and capped) so tech tilts battles without overpowering the strength/adjacency
+# terms — the relative tech gap between two powers is what actually matters.
+func _power_tech_bonus(pid: String) -> int:
+	if pid == "" or pid == NEUTRAL:
+		return 0
+	@warning_ignore("integer_division")
+	return mini(CONQ_TECH_AR_CAP, techs_of_power(pid).size() / CONQ_TECH_AR_PER)
+
 func _army_attack_value(army: Dictionary, tid: String) -> int:
+	var owner := String(army.get("owner", ""))
 	return int(army.get("strength", 1)) * AR_W_ARMY \
-		+ _adjacent_owned_supplied(String(army.get("owner", "")), tid) * AR_W_ADJ
+		+ _adjacent_owned_supplied(owner, tid) * AR_W_ADJ \
+		+ _power_tech_bonus(owner)
 
 func _defense_value(tid: String) -> int:
 	var owner := String(conquest_owner.get(tid, ""))
@@ -835,7 +848,8 @@ func _defense_value(tid: String) -> int:
 	else:
 		base = CONQ_GARRISON_CITY if _is_city(conquest_territory(tid)) else CONQ_GARRISON_RESOURCE
 	return base + conquest_fortify_level(tid) * AR_W_FORT \
-		+ int(conquest_territory(tid).get("defense", 0)) + AR_W_DEFENDER
+		+ int(conquest_territory(tid).get("defense", 0)) + AR_W_DEFENDER \
+		+ _power_tech_bonus(owner)
 
 # Auto-resolve an army's attack on a tile: on a win the defender army (if any) is
 # destroyed, ownership flips, and the attacker advances onto the tile.

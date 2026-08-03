@@ -329,6 +329,11 @@ func _run() -> void:
 	gs.begin_conquest_attack("r_cap")
 	ok(gs.conquest_enemy_pid() == "red", "the battle's enemy power is identified for tech buffing")
 	gs.cancel_conquest_battle()
+	# Strategic auto-resolve: a more advanced power defends/attacks better (capped).
+	var def_before: int = gs._defense_value("r_cap")
+	gs.conquest_power_techs["red"] = gs._techs_up_to_year(1760)   # red researches the whole tree
+	ok(gs._defense_value("r_cap") > def_before, "a more advanced power defends better (strategic tech term)")
+	ok(gs._power_tech_bonus("red") == gs.CONQ_TECH_AR_CAP, "the auto-resolve tech bonus is capped")
 
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
