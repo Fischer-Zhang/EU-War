@@ -945,5 +945,267 @@
         ]
       }
     ]
+  },
+  "italian_wars": {
+    "title": "征服:義大利戰爭",
+    "description": "文藝復興的義大利半島——法蘭西、西班牙、神聖羅馬帝國與威尼斯爭奪米蘭、佛羅倫斯、羅馬等富庶城邦。你執掌法蘭西,越過阿爾卑斯揮軍南下。城市是補給與存亡命脈,中立城邦是擴張的獵物;每回合結束列強各自出兵。",
+    "recruit_unit": "arquebusiers",
+    "powers": [
+      {
+        "id": "france",
+        "name": "法蘭西",
+        "color": "#2f6fb0",
+        "controller": "player",
+        "start_treasury": 4
+      },
+      {
+        "id": "spain",
+        "name": "西班牙",
+        "color": "#d4a017",
+        "controller": "ai",
+        "start_treasury": 4
+      },
+      {
+        "id": "empire",
+        "name": "神聖羅馬帝國",
+        "color": "#c9c9d0",
+        "controller": "ai",
+        "start_treasury": 3
+      },
+      {
+        "id": "venice",
+        "name": "威尼斯",
+        "color": "#1f9e8f",
+        "controller": "ai",
+        "start_treasury": 3
+      }
+    ],
+    "territories": [
+      {
+        "id": "lyon",
+        "name": "里昂",
+        "owner": "france",
+        "type": "city",
+        "x": 0.12,
+        "y": 0.3,
+        "scenario": "04_marignano_1515",
+        "links": [
+          "milan",
+          "provence",
+          "savoy"
+        ]
+      },
+      {
+        "id": "provence",
+        "name": "普羅旺斯",
+        "owner": "france",
+        "type": "resource",
+        "x": 0.14,
+        "y": 0.46,
+        "scenario": "14_ravenna_1512",
+        "links": [
+          "genoa",
+          "lyon"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "tyrol",
+        "name": "蒂羅爾",
+        "owner": "empire",
+        "type": "city",
+        "x": 0.6,
+        "y": 0.12,
+        "scenario": "06_breitenfeld_1631",
+        "links": [
+          "bohemia",
+          "milan",
+          "verona"
+        ]
+      },
+      {
+        "id": "bohemia",
+        "name": "波希米亞",
+        "owner": "empire",
+        "type": "resource",
+        "x": 0.74,
+        "y": 0.1,
+        "scenario": "25_lutzen_1632",
+        "links": [
+          "tyrol",
+          "venice_city"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "venice_city",
+        "name": "威尼斯",
+        "owner": "venice",
+        "type": "city",
+        "x": 0.8,
+        "y": 0.3,
+        "scenario": "26_nordlingen_1634",
+        "links": [
+          "bohemia",
+          "romagna",
+          "verona"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "verona",
+        "name": "維洛那",
+        "owner": "venice",
+        "type": "resource",
+        "x": 0.66,
+        "y": 0.24,
+        "scenario": "15_bicocca_1522",
+        "links": [
+          "milan",
+          "romagna",
+          "tyrol",
+          "venice_city"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "milan",
+        "name": "米蘭",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.42,
+        "y": 0.28,
+        "scenario": "04_marignano_1515",
+        "links": [
+          "lyon",
+          "pavia",
+          "savoy",
+          "tyrol",
+          "verona"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "savoy",
+        "name": "薩伏依",
+        "owner": "neutral",
+        "type": "resource",
+        "x": 0.28,
+        "y": 0.4,
+        "scenario": "05_pavia_1525",
+        "links": [
+          "genoa",
+          "lyon",
+          "milan",
+          "pavia"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "pavia",
+        "name": "帕維亞",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.44,
+        "y": 0.42,
+        "scenario": "05_pavia_1525",
+        "links": [
+          "florence",
+          "genoa",
+          "milan",
+          "savoy"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "genoa",
+        "name": "熱那亞",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.3,
+        "y": 0.56,
+        "scenario": "15_bicocca_1522",
+        "links": [
+          "florence",
+          "pavia",
+          "provence",
+          "savoy"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "florence",
+        "name": "佛羅倫斯",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.52,
+        "y": 0.54,
+        "scenario": "14_ravenna_1512",
+        "links": [
+          "genoa",
+          "pavia",
+          "romagna",
+          "rome"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "romagna",
+        "name": "羅馬涅",
+        "owner": "neutral",
+        "type": "resource",
+        "x": 0.64,
+        "y": 0.44,
+        "scenario": "14_ravenna_1512",
+        "links": [
+          "florence",
+          "rome",
+          "venice_city",
+          "verona"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "rome",
+        "name": "羅馬(教皇國)",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.56,
+        "y": 0.68,
+        "scenario": "13_cerignola_1503",
+        "links": [
+          "florence",
+          "naples",
+          "romagna"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "naples",
+        "name": "那不勒斯",
+        "owner": "spain",
+        "type": "city",
+        "x": 0.62,
+        "y": 0.82,
+        "scenario": "13_cerignola_1503",
+        "links": [
+          "rome",
+          "sicily"
+        ]
+      },
+      {
+        "id": "sicily",
+        "name": "西西里",
+        "owner": "spain",
+        "type": "resource",
+        "x": 0.54,
+        "y": 0.93,
+        "scenario": "15_bicocca_1522",
+        "links": [
+          "naples"
+        ],
+        "yield": 2
+      }
+    ]
   }
 }

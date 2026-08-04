@@ -335,6 +335,13 @@ func _run() -> void:
 	ok(gs._defense_value("r_cap") > def_before, "a more advanced power defends better (strategic tech term)")
 	ok(gs._power_tech_bonus("red") == gs.CONQ_TECH_AR_CAP, "the auto-resolve tech bonus is capped")
 
+	# --- Italian Wars theater loads (content map) ---
+	gs.start_conquest("italian_wars", 1500)
+	ok(gs.conquest_powers.size() == 4 and not gs.armies_of("france").is_empty(),
+		"italian_wars starts with 4 powers and a player army")
+	ok(gs.territory_attackable("milan"),
+		"italian_wars: the neutral Italian prize (Milan) is attackable from the French capital")
+
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()
