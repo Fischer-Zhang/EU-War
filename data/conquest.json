@@ -1207,5 +1207,275 @@
         "yield": 2
       }
     ]
+  },
+  "great_northern_war": {
+    "title": "征服:大北方戰爭",
+    "description": "1700年的波羅的海——瑞典的波羅的海帝國四面受敵,俄羅斯、丹麥與波蘭-薩克森聯手來犯。你執掌瑞典,以精兵守住斯堪地那維亞與利沃尼亞、但澤等波羅的海要港;中立港邦是各強爭奪的獵物。城市是補給與存亡命脈,每回合結束列強各自出兵。",
+    "recruit_unit": "musketeers",
+    "powers": [
+      {
+        "id": "sweden",
+        "name": "瑞典",
+        "color": "#3a6ea5",
+        "controller": "player",
+        "start_treasury": 3
+      },
+      {
+        "id": "russia",
+        "name": "俄羅斯",
+        "color": "#3f8f4f",
+        "controller": "ai",
+        "start_treasury": 4
+      },
+      {
+        "id": "denmark",
+        "name": "丹麥",
+        "color": "#c0392b",
+        "controller": "ai",
+        "start_treasury": 3
+      },
+      {
+        "id": "poland",
+        "name": "波蘭-薩克森",
+        "color": "#8e6fb0",
+        "controller": "ai",
+        "start_treasury": 3
+      }
+    ],
+    "territories": [
+      {
+        "id": "stockholm",
+        "name": "斯德哥爾摩",
+        "owner": "sweden",
+        "type": "city",
+        "x": 0.4,
+        "y": 0.12,
+        "scenario": "06_breitenfeld_1631",
+        "links": [
+          "estonia",
+          "finland",
+          "pomerania",
+          "scania"
+        ]
+      },
+      {
+        "id": "finland",
+        "name": "芬蘭",
+        "owner": "sweden",
+        "type": "resource",
+        "x": 0.56,
+        "y": 0.1,
+        "scenario": "11_narva_1700",
+        "links": [
+          "estonia",
+          "novgorod",
+          "stockholm"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "novgorod",
+        "name": "諾夫哥羅德",
+        "owner": "russia",
+        "type": "city",
+        "x": 0.84,
+        "y": 0.28,
+        "scenario": "09_poltava_1709",
+        "links": [
+          "estonia",
+          "finland",
+          "pskov"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "pskov",
+        "name": "普斯科夫",
+        "owner": "russia",
+        "type": "resource",
+        "x": 0.74,
+        "y": 0.34,
+        "scenario": "12_lesnaya_1708",
+        "links": [
+          "lithuania",
+          "livonia",
+          "novgorod"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "copenhagen",
+        "name": "哥本哈根",
+        "owner": "denmark",
+        "type": "city",
+        "x": 0.18,
+        "y": 0.3,
+        "scenario": "25_lutzen_1632",
+        "links": [
+          "holstein",
+          "pomerania",
+          "scania"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "holstein",
+        "name": "荷爾斯泰因",
+        "owner": "denmark",
+        "type": "resource",
+        "x": 0.2,
+        "y": 0.44,
+        "scenario": "26_nordlingen_1634",
+        "links": [
+          "copenhagen",
+          "pomerania",
+          "saxony"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "warsaw",
+        "name": "華沙",
+        "owner": "poland",
+        "type": "city",
+        "x": 0.62,
+        "y": 0.58,
+        "scenario": "18_kunersdorf_1759",
+        "links": [
+          "danzig",
+          "lithuania",
+          "saxony"
+        ]
+      },
+      {
+        "id": "saxony",
+        "name": "薩克森",
+        "owner": "poland",
+        "type": "resource",
+        "x": 0.42,
+        "y": 0.55,
+        "scenario": "22_mollwitz_1741",
+        "links": [
+          "danzig",
+          "holstein",
+          "pomerania",
+          "warsaw"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "scania",
+        "name": "斯堪尼亞",
+        "owner": "neutral",
+        "type": "resource",
+        "x": 0.32,
+        "y": 0.22,
+        "scenario": "25_lutzen_1632",
+        "links": [
+          "copenhagen",
+          "pomerania",
+          "stockholm"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "pomerania",
+        "name": "波美拉尼亞",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.38,
+        "y": 0.4,
+        "scenario": "06_breitenfeld_1631",
+        "links": [
+          "copenhagen",
+          "danzig",
+          "holstein",
+          "saxony",
+          "scania",
+          "stockholm"
+        ]
+      },
+      {
+        "id": "danzig",
+        "name": "但澤",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.5,
+        "y": 0.48,
+        "scenario": "09_poltava_1709",
+        "links": [
+          "courland",
+          "lithuania",
+          "pomerania",
+          "saxony",
+          "warsaw"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "courland",
+        "name": "庫爾蘭",
+        "owner": "neutral",
+        "type": "resource",
+        "x": 0.58,
+        "y": 0.42,
+        "scenario": "11_narva_1700",
+        "links": [
+          "danzig",
+          "lithuania",
+          "livonia"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "lithuania",
+        "name": "立陶宛",
+        "owner": "neutral",
+        "type": "resource",
+        "x": 0.72,
+        "y": 0.48,
+        "scenario": "18_kunersdorf_1759",
+        "links": [
+          "courland",
+          "danzig",
+          "livonia",
+          "pskov",
+          "warsaw"
+        ],
+        "yield": 2
+      },
+      {
+        "id": "livonia",
+        "name": "利沃尼亞(里加)",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.68,
+        "y": 0.38,
+        "scenario": "11_narva_1700",
+        "links": [
+          "courland",
+          "estonia",
+          "lithuania",
+          "pskov"
+        ],
+        "yield": 1
+      },
+      {
+        "id": "estonia",
+        "name": "愛沙尼亞",
+        "owner": "neutral",
+        "type": "city",
+        "x": 0.7,
+        "y": 0.24,
+        "scenario": "12_lesnaya_1708",
+        "links": [
+          "finland",
+          "livonia",
+          "novgorod",
+          "stockholm"
+        ],
+        "yield": 1
+      }
+    ]
   }
 }

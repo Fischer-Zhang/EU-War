@@ -341,6 +341,11 @@ func _run() -> void:
 		"italian_wars starts with 4 powers and a player army")
 	ok(gs.territory_attackable("milan"),
 		"italian_wars: the neutral Italian prize (Milan) is attackable from the French capital")
+	gs.start_conquest("great_northern_war", 1700)
+	ok(gs.conquest_powers.size() == 4 and gs.player_power_id == "sweden" and not gs.armies_of("sweden").is_empty(),
+		"great_northern_war starts with Sweden (player) among 4 Baltic powers")
+	ok(gs.territory_attackable("estonia"),
+		"great_northern_war: a neutral Baltic prize (Estonia) is attackable from Stockholm")
 
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
