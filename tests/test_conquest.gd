@@ -166,6 +166,20 @@ func _run() -> void:
 	gs.start_conquest(qid); gs.advance_conquest_round()
 	ok(ev1 == String(gs.conquest_last_event.get("id", "")), "events are deterministic across runs")
 
+	# --- Era-scoped 歐陸大事件 pool (the era IS the scenario) ---
+	gs.start_conquest("grand_europe", 1631)   # 火藥革命
+	var ids_g := []
+	for e in gs._active_events(): ids_g.append(String(e["id"]))
+	ok("thirty_years_war" in ids_g, "the era's great event is in the pool (Thirty Years' War @1631)")
+	ok(not ("hundred_years_war" in ids_g) and not ("great_northern_war" in ids_g),
+		"other eras' great events are excluded from the 1631 pool")
+	ok("harvest" in ids_g, "era-agnostic baseline events remain available")
+	gs.start_conquest("grand_europe", 1314)   # 中世紀
+	var ids_m := []
+	for e in gs._active_events(): ids_m.append(String(e["id"]))
+	ok("hundred_years_war" in ids_m and not ("silver" in ids_m),
+		"medieval pool has the Hundred Years' War but not New-World silver (min_year 1500)")
+
 	# --- Real battle: fielding + enemy army strength, training, barrage ---
 	gs.start_conquest(qid)
 	gs.army_by_id("blue#0")["strength"] = 3

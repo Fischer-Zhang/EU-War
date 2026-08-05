@@ -511,10 +511,27 @@ const CONQ_EVENTS := [
 	{"id": "spies", "name": "間諜網", "kind": "prep", "prep": "recon", "amount": 0, "text": "下場戰鬥全軍視野 +1。"},
 	{"id": "plague", "name": "瘟疫", "kind": "resource", "amount": -4, "text": "瘟疫肆虐,稅收銳減(資源 −4)。"},
 	{"id": "revolt", "name": "地方叛亂", "kind": "revolt", "amount": 0, "text": "一塊資源領地脫離掌控。"},
-	{"id": "silver", "name": "新大陸白銀", "kind": "resource", "amount": 8, "text": "新大陸白銀運抵,國庫暴增(資源 +8)。"},
+	{"id": "silver", "name": "新大陸白銀", "kind": "resource", "amount": 8, "min_year": 1500, "text": "新大陸白銀運抵,國庫暴增(資源 +8)。"},
 	{"id": "famine", "name": "饑荒", "kind": "resource", "amount": -5, "text": "歉收饑荒,民生凋敝(資源 −5)。"},
 	{"id": "drillmaster", "name": "名將操練", "kind": "promote", "amount": 0, "text": "名將投效,一支老兵晉升一階。"},
 	{"id": "mutiny", "name": "傭兵譁變", "kind": "disband", "amount": 0, "text": "欠餉譁變,一支部隊譁散(失去名冊中最生嫩的一支)。"},
+	# --- 歐陸大事件:依開局年代登場(the era IS the scenario) ---
+	# 中世紀 (≤1450)
+	{"id": "hundred_years_war", "name": "百年戰爭", "kind": "recruit", "max_year": 1450, "text": "英法百年戰爭烽火再起,愛國熱潮為你添一支部隊。"},
+	{"id": "black_death", "name": "黑死病", "kind": "resource", "amount": -7, "max_year": 1450, "text": "黑死病橫掃歐陸,人口銳減、稅收崩跌(資源 −7)。"},
+	{"id": "crusade", "name": "十字軍號召", "kind": "promote", "max_year": 1450, "text": "教廷號召聖戰,一支騎士老兵晉升一階。"},
+	# 文藝復興 (1451–1560)
+	{"id": "italian_wars", "name": "義大利戰爭", "kind": "prep", "prep": "barrage", "min_year": 1451, "max_year": 1560, "text": "列強逐鹿亞平寧,砲兵大展身手(下場戰鬥敵軍開局遭砲擊)。"},
+	{"id": "reformation", "name": "宗教改革", "kind": "revolt", "min_year": 1451, "max_year": 1620, "text": "宗教改革撕裂歐陸,一塊資源領地陷入動盪脫離掌控。"},
+	{"id": "renaissance_art", "name": "文藝復興軍革", "kind": "prep", "prep": "recon", "min_year": 1451, "max_year": 1560, "text": "文藝復興的軍事革新(下場戰鬥全軍視野 +1)。"},
+	# 火藥革命 (1561–1680)
+	{"id": "thirty_years_war", "name": "三十年戰爭", "kind": "recruit", "min_year": 1561, "max_year": 1680, "text": "三十年戰爭席捲德意志,傭兵雲集(添一支部隊)。"},
+	{"id": "armada", "name": "海上決戰", "kind": "resource", "amount": 5, "min_year": 1561, "max_year": 1700, "text": "艦隊決戰奪得制海與財貨(資源 +5)。"},
+	{"id": "military_revolution", "name": "火藥革命", "kind": "prep", "prep": "barrage", "min_year": 1561, "max_year": 1680, "text": "野戰砲兵編制成軍(下場戰鬥敵軍開局遭砲擊)。"},
+	# 理性時代 (1681+)
+	{"id": "great_northern_war", "name": "大北方戰爭", "kind": "recruit", "min_year": 1681, "text": "大北方戰爭於波羅的海爆發,老兵回流(添一支部隊)。"},
+	{"id": "spanish_succession", "name": "西班牙王位繼承", "kind": "resource", "amount": 6, "min_year": 1681, "text": "王位繼承的聯姻與談判帶來大筆資財(資源 +6)。"},
+	{"id": "vienna_siege", "name": "維也納之圍", "kind": "fortify", "min_year": 1681, "text": "鄂圖曼大軍壓境,前線城市連夜加築工事。"},
 ]
 # Strategic economy: owned territories earn strength each round, spent on a
 # global army level (+attack in battles), fortifying frontier regions (defenders
@@ -1224,13 +1241,28 @@ func advance_conquest_round() -> bool:
 	return true
 
 # --- Historical events (deterministic, player-only) ---
+# Events applicable to the game's chosen era: the era-agnostic baseline plus the
+# 歐陸大事件 whose [min_year, max_year] span the start year. The era IS the
+# scenario, so which great events can strike is fixed by the era you began in.
+func _active_events() -> Array:
+	var out: Array = []
+	for e in CONQ_EVENTS:
+		var y := conquest_start_year
+		if e.has("min_year") and y < int(e["min_year"]):
+			continue
+		if e.has("max_year") and y > int(e["max_year"]):
+			continue
+		out.append(e)
+	return out
+
 func _maybe_fire_event() -> void:
 	conquest_last_event = {}
-	if CONQ_EVENTS.is_empty():
+	var pool := _active_events()
+	if pool.is_empty():
 		return
 	if abs(hash("evt:%d" % conquest_round)) % 100 >= CONQ_EVENT_CHANCE:
 		return
-	var evt: Dictionary = CONQ_EVENTS[abs(hash("evtpick:%d" % conquest_round)) % CONQ_EVENTS.size()]
+	var evt: Dictionary = pool[abs(hash("evtpick:%d" % conquest_round)) % pool.size()]
 	_apply_event(evt)
 	conquest_last_event = evt
 
