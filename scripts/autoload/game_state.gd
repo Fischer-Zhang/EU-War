@@ -173,6 +173,74 @@ func capture_roster(living_player_units: Array) -> void:
 	else:
 		campaign_roster = captured
 
+# Unit types fielded per era, in priority order (index-cycled to fill a force).
+# The chosen conquest era decides which arms take the field — not a canned scenario.
+func _era_force_template(year: int) -> Array:
+	if year <= 1450:
+		return ["men_at_arms", "longbowmen", "heavy_cavalry", "pikemen", "light_cavalry", "crossbowmen"]
+	if year <= 1560:
+		return ["pikemen", "arquebusiers", "heavy_cavalry", "field_cannon", "light_cavalry", "crossbowmen"]
+	if year <= 1680:
+		return ["pikemen", "musketeers", "field_cannon", "heavy_cavalry", "dragoons", "mortar"]
+	return ["musketeers", "dragoons", "field_cannon", "heavy_cavalry", "mortar", "pioneers"]
+
+# How many units a side fields, from its army strength (or a city's garrison when
+# it has no army), capped by how many deployment slots the battlefield offers.
+func _conquest_force_size(strength: int, slots: int) -> int:
+	return clampi(CONQ_BATTLE_BASE + max(strength, 0), 1, maxi(slots, 1))
+
+# Replace a conquest battle's units with forces GENERATED from the actual armies:
+# each side's size scales with its army strength (or the city garrison), unit
+# types come from the chosen era, and both deploy onto the battlefield scenario's
+# own per-faction slot positions. Keeps map/factions/victory/deployment intact.
+# A no-op outside a conquest battle. Player veterans are layered on afterwards by
+# apply_roster; per-army strength/tech buffs by _apply_conquest_bonuses.
+func build_conquest_forces(scenario: Dictionary) -> Dictionary:
+	if not in_conquest() or conquest_battle.is_empty():
+		return scenario
+	var pf := resolve_player_faction(scenario)
+	if pf == "":
+		return scenario
+	# Slot positions per faction, in the battlefield scenario's own order.
+	var slots := {}
+	for u in scenario.get("units", []):
+		var fid := String(u.get("faction", ""))
+		if not slots.has(fid):
+			slots[fid] = []
+		slots[fid].append(u.get("at", [0, 0]))
+	var my_army := _battle_fielding_army()
+	var my_strength := int(my_army.get("strength", 1)) if not my_army.is_empty() else 1
+	var enemy_strength := _conquest_enemy_force_strength()
+	var template := _era_force_template(conquest_start_year)
+	var new_units: Array = []
+	for fid in slots.keys():
+		var is_player: bool = String(fid) == pf
+		var strength: int = my_strength if is_player else enemy_strength
+		var positions: Array = slots[fid]
+		var n := _conquest_force_size(strength, positions.size())
+		for i in range(n):
+			var type_id := String(template[i % template.size()])
+			new_units.append({
+				"faction": fid,
+				"type": type_id,
+				"name": String(DataLoader.get_unit_def(type_id).get("name_zh", type_id)),
+				"at": positions[i],
+			})
+	var out := scenario.duplicate(true)
+	out["units"] = new_units
+	return out
+
+# The strength of the force the player faces this battle: the enemy army's, or a
+# city's standing garrison when no enemy army holds the contested tile.
+func _conquest_enemy_force_strength() -> int:
+	var ea := army_by_id(String(conquest_battle.get("enemy_army", "")))
+	if not ea.is_empty():
+		return int(ea.get("strength", 1))
+	var tid := String(conquest_battle.get("territory", ""))
+	if _is_city(conquest_territory(tid)):
+		return CONQ_GARRISON_CITY + conquest_fortify_level(tid)
+	return 1
+
 # Return a scenario dict whose player units are replaced by the carried roster,
 # mapped onto the scenario's own player slot positions (order-preserving). Units
 # start at full HP. A no-op when not in a campaign or the roster is empty.
@@ -482,6 +550,7 @@ const CONQ_ARMY_STR_MAX := 4               # per-army strength cap
 const CONQ_ARMY_START_STR := 1             # strength of a synthesized/raised army
 const CONQ_GARRISON_CITY := 3              # standing garrison strength of an army-less city
 const CONQ_GARRISON_RESOURCE := 0          # army-less resource nodes fall to any adjacent army
+const CONQ_BATTLE_BASE := 2                # units fielded = BASE + strength (capped by map slots)
 const CONQ_RAISE_COST := 5                 # raise a NEW army at a supplied city
 const CONQ_REINFORCE_COST := 4             # +1 strength (and a roster unit) to an army
 # Auto-resolve is LOCAL, not empire-wide: a power's strength at a front comes from

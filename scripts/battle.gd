@@ -99,6 +99,10 @@ func _ready() -> void:
 	scenario = DataLoader.get_scenario(sid)
 	if scenario.is_empty():
 		scenario = DataLoader.get_scenario(DEFAULT_SCENARIO)
+	# Conquest: field forces generated from the actual armies (size by strength,
+	# arms by era) on this territory's terrain — not the scenario's canned units.
+	# No-op outside a conquest battle. Veterans then layer on via apply_roster.
+	scenario = GameState.build_conquest_forces(scenario)
 	scenario = GameState.apply_roster(scenario)
 	scenario = GameState.apply_conquest_faction_labels(scenario)
 	_setup_scenario()

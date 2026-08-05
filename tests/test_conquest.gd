@@ -347,6 +347,36 @@ func _run() -> void:
 	ok(gs.territory_attackable("estonia"),
 		"great_northern_war: a neutral Baltic prize (Estonia) is attackable from Stockholm")
 
+	# --- Conquest battles field forces GENERATED from the actual armies ---
+	gs.start_conquest(qid)   # default era 1631 -> gunpowder template
+	var base_scn = dl.get_scenario("02_crecy_1346")
+	var pf_atk: String = gs.resolve_player_faction(base_scn)
+	gs.army_by_id("blue#0")["strength"] = 1
+	gs.begin_conquest_attack("r_cap")
+	var g1 = gs.build_conquest_forces(base_scn)
+	var c1 = 0
+	for u in g1["units"]:
+		if String(u["faction"]) == pf_atk: c1 += 1
+	gs.cancel_conquest_battle()
+	gs.army_by_id("blue#0")["strength"] = 4
+	gs.begin_conquest_attack("r_cap")
+	var g4 = gs.build_conquest_forces(base_scn)
+	var c4 = 0
+	for u in g4["units"]:
+		if String(u["faction"]) == pf_atk: c4 += 1
+	ok(c1 == 3 and c4 == 6, "force size scales with army strength (str1->3 units, str4->6)")
+	var tmpl: Array = gs._era_force_template(gs.conquest_start_year)
+	var all_in = true
+	for u in g4["units"]:
+		if not (String(u["type"]) in tmpl): all_in = false
+	ok(all_in, "generated units all come from the era template")
+	var g4b = gs.build_conquest_forces(base_scn)
+	ok(JSON.stringify(g4["units"]) == JSON.stringify(g4b["units"]), "force generation is deterministic")
+	gs.cancel_conquest_battle()
+	gs.clear_conquest()
+	ok(gs.build_conquest_forces(base_scn)["units"].size() == base_scn["units"].size(),
+		"build_conquest_forces is a no-op outside a conquest battle")
+
 	# --- Map builds + drives ---
 	gs.start_conquest("continental")
 	var map = load("res://scenes/conquest_map.tscn").instantiate()
