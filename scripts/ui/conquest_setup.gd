@@ -67,20 +67,12 @@ func _rebuild() -> void:
 	for c in _body.get_children():
 		c.queue_free()
 
-	_header("開始新征服", 30)
-	_header("設定你的戰局:地圖、開局年代與難度。", 15, Color(0.78, 0.82, 0.88))
+	_header("開始新征服 · 歐陸霸權", 30)
+	_header("同一張歐陸大棋盤,劇本由開局年代決定——不同年代有不同的科技起點與歐陸大事件。", 15, Color(0.78, 0.82, 0.88))
 
-	# Map (only offer a chooser when there's more than one).
-	var conqs := DataLoader.conquests.keys()
-	if conqs.size() > 1:
-		_header("地圖", 18)
-		var maps := []
-		for cid in conqs:
-			maps.append([String(DataLoader.get_conquest(String(cid)).get("title", cid)), String(cid)])
-		_row(maps, _map_id, func(v): _map_id = v; _rebuild())
-
-	# Era — the tech starting point.
-	_header("開局年代(決定科技起點)", 18)
+	# One unified theater (grand_europe); the era IS the scenario.
+	# Era — the tech starting point + era-scoped events.
+	_header("開局年代(劇本:科技起點 + 歐陸大事件)", 18)
 	for e in ERAS:
 		var yr := int(e["year"])
 		var seeded: int = GameState._techs_up_to_year(yr).size()

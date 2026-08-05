@@ -335,18 +335,6 @@ func _run() -> void:
 	ok(gs._defense_value("r_cap") > def_before, "a more advanced power defends better (strategic tech term)")
 	ok(gs._power_tech_bonus("red") == gs.CONQ_TECH_AR_CAP, "the auto-resolve tech bonus is capped")
 
-	# --- Italian Wars theater loads (content map) ---
-	gs.start_conquest("italian_wars", 1500)
-	ok(gs.conquest_powers.size() == 4 and not gs.armies_of("france").is_empty(),
-		"italian_wars starts with 4 powers and a player army")
-	ok(gs.territory_attackable("milan"),
-		"italian_wars: the neutral Italian prize (Milan) is attackable from the French capital")
-	gs.start_conquest("great_northern_war", 1700)
-	ok(gs.conquest_powers.size() == 4 and gs.player_power_id == "sweden" and not gs.armies_of("sweden").is_empty(),
-		"great_northern_war starts with Sweden (player) among 4 Baltic powers")
-	ok(gs.territory_attackable("estonia"),
-		"great_northern_war: a neutral Baltic prize (Estonia) is attackable from Stockholm")
-
 	# --- Conquest battles field forces GENERATED from the actual armies ---
 	gs.start_conquest(qid)   # default era 1631 -> gunpowder template
 	var base_scn = dl.get_scenario("02_crecy_1346")
