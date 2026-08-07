@@ -561,7 +561,6 @@ const CONQ_RECRUIT_COST := 5               # raise a fresh veteran at a supplied
 const CONQ_HEAL_COST := 3                  # reinforce (rank up) the weakest roster unit
 const CONQ_ROSTER_MAX := 8
 const CONQ_AI_ARMY_COST := 4
-const CONQ_AI_ARMY_MAX := 4
 # Battlefield-army tunables.
 const CONQ_ARMY_STR_MAX := 4               # per-army strength cap
 const CONQ_ARMY_START_STR := 1             # strength of a synthesized/raised army
@@ -791,9 +790,6 @@ func conquest_power(pid: String) -> Dictionary:
 			return p
 	return {}
 
-func power_controller(pid: String) -> String:
-	return String(conquest_power(pid).get("controller", ""))
-
 # A power's historical starting war-chest (data-driven; defaults to the flat
 # start). Lets each power open with resources scaled to its real fiscal strength.
 func _power_start_treasury(pid: String) -> int:
@@ -1012,13 +1008,6 @@ func conquest_supplied_for(pid: String) -> Dictionary:
 				stack.append(nb)
 	return supplied
 
-# Player-side aliases (keep the old names for UI/tests).
-func conquest_supply_sources() -> Array:
-	return conquest_supply_sources_for(player_power_id)
-
-func conquest_supplied() -> Dictionary:
-	return conquest_supplied_for(player_power_id)
-
 func territory_supplied(tid: String) -> bool:
 	var owner := String(conquest_owner.get(tid, ""))
 	if owner == "" or owner == NEUTRAL:
@@ -1111,27 +1100,12 @@ func _ai_march_step(army: Dictionary) -> String:
 	return ""
 
 # --- Difficulty ladder for the rival powers' strategic AI ---
-func _conq_ai_army_max() -> int:
-	match conquest_difficulty:
-		"easy": return 2
-		"hard": return 6
-	return CONQ_AI_ARMY_MAX
-
 func _conq_ai_margin_min() -> int:
 	# Minimum estimated margin before an AI will launch an attack (higher = timid).
 	return 3 if conquest_difficulty == "easy" else 1
 
 func _conq_ai_income_bonus() -> int:
 	return 1 if conquest_difficulty == "hard" else 0
-
-func _conq_ai_fortifies() -> bool:
-	return conquest_difficulty != "easy"
-
-# Set the grand game's difficulty (chosen at its start; persisted).
-func set_conquest_difficulty(d: String) -> void:
-	if in_conquest():
-		conquest_difficulty = d
-		save_conquest()
 
 # --- Diplomacy: player-brokered truces (mutual non-aggression for N rounds) ---
 func at_truce(pid: String) -> bool:
@@ -1614,10 +1588,6 @@ func develop(track: String) -> bool:
 	save_conquest()
 	return true
 
-func develop_level(track: String) -> int:
-	var s := _develop_state(track)
-	return int(s[0]) if not s.is_empty() else 0
-
 # --- Pre-battle preparations (one-shot, applied to the next battle) ---
 
 func can_prepare(kind: String) -> bool:
@@ -1639,14 +1609,6 @@ func prep_active(kind: String) -> bool:
 	return bool(conquest_prep.get(kind, false))
 
 # --- City actions: recruit fresh troops / reinforce, at a supplied city ---
-
-func conquest_has_supplied_city() -> bool:
-	var sup := conquest_supplied_for(player_power_id)
-	for t in conquest_territories():
-		var tid := String(t.get("id", ""))
-		if _is_city(t) and String(conquest_owner.get(tid, "")) == player_power_id and sup.has(tid):
-			return true
-	return false
 
 func _recruit_type() -> String:
 	return String(DataLoader.get_conquest(conquest_id).get("recruit_unit", "musketeers"))
